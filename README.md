@@ -1,6 +1,6 @@
 ```markdown
 # GitHub Follower Tracker
-
+```
 This project is a simple Flask web application that tracks your GitHub followers, following, unfollowers, and new followers. 
 It allows you to monitor changes in your GitHub social connections, filter out certain users, and see which users are not following you back.
 
@@ -12,7 +12,7 @@ It allows you to monitor changes in your GitHub social connections, filter out c
 - **Not Following Back**: View users you follow but who do not follow you back.
 - **New Followers**: Track users who have followed you within the last 3 days.
 - **Ignore List**: Specify users who should be excluded from the "Not Following Back" list.
-
+```
 ## Requirements
 
 - **Python 3.6+**
@@ -26,8 +26,8 @@ It allows you to monitor changes in your GitHub social connections, filter out c
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/github-follower-tracker.git
-cd github-follower-tracker
+git clone https://github.com/yourusername/GitHub-followers-tracker.git
+cd GitHub-followers-tracker.git
 ```
 
 ### 2. Set Up a Virtual Environment (Optional but Recommended)
@@ -97,7 +97,7 @@ These files are essential for tracking followers, filtering users, and recording
 Ensure your project directory looks like this:
 
 ```
-Flask-app-track-followers/
+GitHub-followers-tracker/
 │
 ├── app.py                          # The main Flask application
 ├── previous_followers.txt          # Stores the list of previous followers
@@ -108,7 +108,7 @@ Flask-app-track-followers/
 │   └── styles.css                  # The CSS file for styling the HTML pages
 ├── templates/
 │   └── index.html                  # The HTML template for the main page
-└── .venv/                          # Virtual environment directory (optional, but recommended)
+└── .env/                          # Virtual environment directory (optional, but recommended)
 ```
 
 ### 6. Explanation of Key Files
