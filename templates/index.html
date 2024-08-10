@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Follower Tracker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script>
+      function toggleVisibility(id) {
+          var element = document.getElementById(id);
+          if (element.style.maxHeight) {
+              element.style.maxHeight = null;
+          } else {
+              element.style.maxHeight = element.scrollHeight + "px";
+          }
+      }
+  </script>
+</head>
+<body>
+
+<div class="container">
+  <h1>GitHub Follower Tracker</h1>
+
+  <h2 onclick="toggleVisibility('followers-list')">Followers ({{ followers|length }})</h2>
+  <ul id="followers-list" class="collapsible-list">
+    {% for follower in followers %}
+      <li>{{ follower }}</li>
+    {% endfor %}
+  </ul>
+
+  <h2 onclick="toggleVisibility('following-list')">Following ({{ following|length }})</h2>
+  <ul id="following-list" class="collapsible-list">
+    {% for follow in following %}
+      <li>{{ follow }}</li>
+    {% endfor %}
+  </ul>
+
+  <h2 onclick="toggleVisibility('new-followers-list')">New Followers ({{ new_followers|length }})</h2>
+  <ul id="new-followers-list" class="collapsible-list">
+    {% for new_follower in new_followers %}
+      <li>{{ new_follower }}</li>
+    {% endfor %}
+  </ul>
+
+  <h2 onclick="toggleVisibility('unfollowers-list')">Unfollowers ({{ unfollowers|length }})</h2>
+  <ul id="unfollowers-list" class="collapsible-list">
+    {% for unfollower in unfollowers %}
+      <li>{{ unfollower }}</li>
+    {% endfor %}
+  </ul>
+
+  <h2 onclick="toggleVisibility('not-following-back-list')">Not Following Back ({{ not_following_back|length }})</h2>
+  <ul id="not-following-back-list" class="collapsible-list">
+    {% for not_follow_back in not_following_back %}
+      <li>{{ not_follow_back }}</li>
+    {% endfor %}
+  </ul>
+
+  <a href="/" class="btn-refresh">Refresh Data</a>
+</div>
+
+</body>
+</html>

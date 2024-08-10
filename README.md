@@ -1,11 +1,8 @@
-Here is the complete `README.md` file incorporating all the details you provided, with clear formatting and explanations for each section:
-
-### README.md
-
 ```markdown
 # GitHub Follower Tracker
 
-This project is a simple Flask web application that tracks your GitHub followers, following, unfollowers, and new followers. It allows you to monitor changes in your GitHub social connections, filter out certain users, and see which users are not following you back.
+This project is a simple Flask web application that tracks your GitHub followers, following, unfollowers, and new followers. 
+It allows you to monitor changes in your GitHub social connections, filter out certain users, and see which users are not following you back.
 
 ## Features
 
@@ -22,6 +19,7 @@ This project is a simple Flask web application that tracks your GitHub followers
 - **Flask**: A lightweight WSGI web application framework.
 - **Requests**: A simple HTTP library for Python.
 - **GitHub API Token**: A GitHub personal access token to authenticate API requests.
+```
 
 ## Setup
 
@@ -41,8 +39,10 @@ source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 
 ### 3. Install the Required Dependencies
 
+You can install the required dependencies using the `requirements.txt` file included in the repository:
+
 ```bash
-pip install Flask requests
+pip install -r requirements.txt
 ```
 
 ### 4. Configuration
@@ -63,22 +63,47 @@ GITHUB_USERNAME=your_github_username
 GITHUB_TOKEN=your_github_personal_access_token
 ```
 
-#### Why You Need the `.env` File
+#### Renaming Example Files
+
+To ensure the application runs correctly, you need to rename the example files to their correct names:
+
+- **Rename** `ignore_list.txt.example` to `ignore_list.txt`:
+  ```bash
+  mv ignore_list.txt.example ignore_list.txt
+  ```
+
+- **Rename** `new_followers.json.example` to `new_followers.json`:
+  ```bash
+  mv new_followers.json.example new_followers.json
+  ```
+
+- **Rename** `previous_followers.txt.example` to `previous_followers.txt`:
+  ```bash
+  mv previous_followers.txt.example previous_followers.txt
+  ```
+
+These files are essential for tracking followers, filtering users, and recording changes.
+
+#### Why You Need the `.env` and Other Files
 
 - **GitHub Username**: This is your GitHub handle. It is required to fetch your followers and following lists.
 - **GitHub API Token**: This token is used to authenticate requests to the GitHub API. While the script can work without it, the GitHub API has rate limits for unauthenticated requests. Using a token allows for a higher rate limit, especially useful if you have many followers.
+- **ignore_list.txt**: This file is used to exclude certain users from the "Not Following Back" section.
+- **new_followers.json**: This file tracks new followers along with the time they started following you.
+- **previous_followers.txt**: This file keeps a record of your previous followers to determine who has unfollowed you.
 
 ### 5. File Structure
 
 Ensure your project directory looks like this:
 
 ```
-flaskProject/
+Flask-app-track-followers/
 │
 ├── app.py                          # The main Flask application
 ├── previous_followers.txt          # Stores the list of previous followers
 ├── new_followers.json              # Stores new followers with timestamps
 ├── ignore_list.txt                 # Stores usernames to ignore
+├── requirements.txt                # Lists all the Python dependencies
 ├── static/
 │   └── styles.css                  # The CSS file for styling the HTML pages
 ├── templates/
@@ -155,15 +180,19 @@ If you encounter a `JSONDecodeError` when running the application, it might be d
 This project is a simple tool for managing and tracking your GitHub followers. It can be extended with additional features, such as notifications or integration with other platforms.
 ```
 
-### Key Points Covered:
+### Summary of Additions:
 
-1. **Repository Cloning and Setup**: Instructions for cloning the repository and setting up a virtual environment.
-2. **Dependency Installation**: Commands for installing the required Python packages.
-3. **Configuration**: Detailed explanation of the `.env` file and how to set it up, including why it's needed.
-4. **File Structure**: Overview of the project structure and explanations of each key file.
-5. **Running the Application**: Step-by-step guide to starting the Flask server.
-6. **Usage Instructions**: How to interact with the web application once it's running.
-7. **Customization**: Information on how to customize the script to fit your needs.
-8. **Troubleshooting**: Common issues and how to resolve them, particularly focusing on potential JSON errors.
+1. **Renaming Example Files**: Instructions are added for renaming `ignore_list.txt.example`, `new_followers.json.example`, and `previous_followers.txt.example` to their proper file names.
+2. **Explanation**: The README now clearly explains why these files are needed and how they interact with the script.
+```
 
-This comprehensive README will guide users through every step needed to get your GitHub Follower Tracker up and running, from setup to customization and troubleshooting.
+### `requirements.txt`
+
+Here is the `requirements.txt` file again, which should be placed in your project’s root directory:
+
+```plaintext
+Flask==2.1.2
+requests==2.28.1
+python-decouple==3.8
+requests==2.32.3
+```
