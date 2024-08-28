@@ -14,6 +14,50 @@
               element.style.maxHeight = element.scrollHeight + "px";
           }
       }
+
+      document.addEventListener('DOMContentLoaded', function() {
+          document.querySelectorAll('.unfollow-form').forEach(form => {
+              form.addEventListener('submit', function(event) {
+                  event.preventDefault();
+                  const username = this.action.split('/').pop();
+                  fetch(this.action, {
+                      method: 'POST',
+                      headers: {
+                          'Content-Type': 'application/json',
+                      },
+                  })
+                      .then(response => response.json())
+                      .then(data => {
+                          if (data.success) {
+                              this.parentElement.style.display = 'none';
+                          } else {
+                              alert('Failed to unfollow ' + username);
+                          }
+                      });
+              });
+          });
+
+          document.querySelectorAll('.follow-form').forEach(form => {
+              form.addEventListener('submit', function(event) {
+                  event.preventDefault();
+                  const username = this.action.split('/').pop();
+                  fetch(this.action, {
+                      method: 'POST',
+                      headers: {
+                          'Content-Type': 'application/json',
+                      },
+                  })
+                      .then(response => response.json())
+                      .then(data => {
+                          if (data.success) {
+                              this.parentElement.style.display = 'none';
+                          } else {
+                              alert('Failed to follow ' + username);
+                          }
+                      });
+              });
+          });
+      });
   </script>
 </head>
 <body>
@@ -31,14 +75,41 @@
   <h2 onclick="toggleVisibility('following-list')">Following ({{ following|length }})</h2>
   <ul id="following-list" class="collapsible-list">
     {% for follow in following %}
-      <li>{{ follow }}</li>
+      <li class="list-item">
+        <span>{{ follow }}</span>
+        <div class="button-group">
+          {% if follow in followers %}
+            <!-- User follows you, show only Unfollow button -->
+            <form action="/unfollow/{{ follow }}" method="post" class="unfollow-form" style="display: inline;">
+              <button type="submit" class="btn-unfollow">Unfollow</button>
+            </form>
+          {% else %}
+            <!-- User does not follow you, show both Follow and Unfollow buttons -->
+            <form action="/follow/{{ follow }}" method="post" class="follow-form" style="display: inline;">
+              <button type="submit" class="btn-follow">Follow</button>
+            </form>
+            <form action="/unfollow/{{ follow }}" method="post" class="unfollow-form" style="display: inline;">
+              <button type="submit" class="btn-unfollow">Unfollow</button>
+            </form>
+          {% endif %}
+        </div>
+      </li>
     {% endfor %}
   </ul>
 
   <h2 onclick="toggleVisibility('new-followers-list')">New Followers ({{ new_followers|length }})</h2>
   <ul id="new-followers-list" class="collapsible-list">
     {% for new_follower in new_followers %}
-      <li>{{ new_follower }}</li>
+      <li class="list-item">
+        <span>{{ new_follower }}</span>
+        <div class="button-group">
+          {% if new_follower not in following %}
+            <form action="/follow/{{ new_follower }}" method="post" class="follow-form" style="display: inline;">
+              <button type="submit" class="btn-follow">Follow</button>
+            </form>
+          {% endif %}
+        </div>
+      </li>
     {% endfor %}
   </ul>
 
@@ -52,7 +123,14 @@
   <h2 onclick="toggleVisibility('not-following-back-list')">Not Following Back ({{ not_following_back|length }})</h2>
   <ul id="not-following-back-list" class="collapsible-list">
     {% for not_follow_back in not_following_back %}
-      <li>{{ not_follow_back }}</li>
+      <li class="list-item">
+        <span>{{ not_follow_back }}</span>
+        <div class="button-group">
+          <form action="/unfollow/{{ not_follow_back }}" method="post" class="unfollow-form" style="display: inline;">
+            <button type="submit" class="btn-unfollow">Unfollow</button>
+          </form>
+        </div>
+      </li>
     {% endfor %}
   </ul>
 

@@ -22,6 +22,27 @@ NEW_FOLLOWERS_FILE = 'new_followers.json'
 IGNORE_LIST_FILE = 'ignore_list.txt'
 
 
+@app.route('/follow/<username>', methods=['POST'])
+def follow(username):
+    follow_url = f'https://api.github.com/user/following/{username}'
+    response = requests.put(follow_url, headers=headers)
+
+    if response.status_code == 204:
+        return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
+    else:
+        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
+
+@app.route('/unfollow/<username>', methods=['POST'])
+def unfollow(username):
+    unfollow_url = f'https://api.github.com/user/following/{username}'
+    response = requests.delete(unfollow_url, headers=headers)
+
+    if response.status_code == 204:
+        return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
+    else:
+        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
+
+
 def get_github_data(url):
     data = []
     page = 1

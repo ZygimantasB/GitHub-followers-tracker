@@ -92,3 +92,60 @@ li:hover {
         font-size: 1rem;
     }
 }
+
+/* Button Unfollow */
+
+.btn-unfollow {
+    background-color: #ff5252;
+    color: #ffffff;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.btn-unfollow:hover {
+    background-color: #ff1744;
+}
+
+/* Button Follow */
+
+.list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px; /* Space between buttons */
+}
+
+.btn-follow {
+    background-color: #00b0ff;
+    color: #ffffff;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.btn-follow:hover {
+    background-color: #0091ea;
+}
+
+.btn-unfollow {
+    background-color: #ff5252;
+    color: #ffffff;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.btn-unfollow:hover {
+    background-color: #ff1744;
+}
