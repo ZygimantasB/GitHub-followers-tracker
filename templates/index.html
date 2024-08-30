@@ -116,7 +116,14 @@
   <h2 onclick="toggleVisibility('unfollowers-list')">Unfollowers ({{ unfollowers|length }})</h2>
   <ul id="unfollowers-list" class="collapsible-list">
     {% for unfollower in unfollowers %}
-      <li>{{ unfollower }}</li>
+      <li class="list-item">
+        <span>{{ unfollower }}</span>
+        <div class="button-group">
+          <form action="/unfollow/{{ unfollower }}" method="post" class="unfollow-form" style="display: inline;">
+            <button type="submit" class="btn-unfollow">Unfollow</button>
+          </form>
+        </div>
+      </li>
     {% endfor %}
   </ul>
 
