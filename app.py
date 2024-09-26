@@ -48,11 +48,16 @@ def get_github_data(url):
     page = 1
     while True:
         response = requests.get(url, headers=headers, params={'page': page})
-        response_data = response.json()
-        if not response_data:
-            break
-        data.extend([user['login'] for user in response_data])
-        page += 1
+        try:
+            response_data = response.json()
+            if not isinstance(response_data, list):
+                break  # Exit the loop if the response is not a list
+            if not response_data:
+                break
+            data.extend([user['login'] for user in response_data])
+            page += 1
+        except json.JSONDecodeError:
+            break  # Exit the loop if the response is not valid JSON
     return data
 
 
