@@ -141,6 +141,21 @@
     {% endfor %}
   </ul>
 
+  <!-- New Tab for Suggested Users -->
+  <h2 onclick="toggleVisibility('suggested-users-list')">Suggested Users ({{ suggested_users|length }})</h2>
+  <ul id="suggested-users-list" class="collapsible-list">
+    {% for user in suggested_users %}
+      <li class="list-item">
+        <span>{{ user }}</span>
+        <div class="button-group">
+          <form action="/follow/{{ user }}" method="post" class="follow-form" style="display: inline;">
+            <button type="submit" class="btn-follow">Follow</button>
+          </form>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+
   <a href="/" class="btn-refresh">Refresh Data</a>
 </div>
 

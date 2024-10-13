@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import random
 from flask import Flask, render_template, request
 from datetime import datetime, timedelta
 from decouple import config
@@ -20,7 +21,6 @@ headers = {
 PREVIOUS_FOLLOWERS_FILE = 'previous_followers.txt'
 NEW_FOLLOWERS_FILE = 'new_followers.json'
 IGNORE_LIST_FILE = 'ignore_list.txt'
-
 
 @app.route('/follow/<username>', methods=['POST'])
 def follow(username):
@@ -42,38 +42,36 @@ def unfollow(username):
     else:
         return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
 
-
-def get_github_data(url):
+def get_github_data(url, per_page=100, max_pages=10):
     data = []
     page = 1
-    while True:
-        response = requests.get(url, headers=headers, params={'page': page})
+    while page <= max_pages:
+        response = requests.get(url, headers=headers, params={'page': page, 'per_page': per_page})
+        if response.status_code == 403:
+            print("API rate limit exceeded.")
+            break
         try:
             response_data = response.json()
             if not isinstance(response_data, list):
-                break  # Exit the loop if the response is not a list
+                break
             if not response_data:
                 break
             data.extend([user['login'] for user in response_data])
             page += 1
         except json.JSONDecodeError:
-            break  # Exit the loop if the response is not valid JSON
+            break
     return data
 
-
 def load_previous_followers():
-    """Load previous followers from a file."""
     if os.path.exists(PREVIOUS_FOLLOWERS_FILE):
         with open(PREVIOUS_FOLLOWERS_FILE, 'r') as file:
             return file.read().splitlines()
     return []
 
-
 def save_followers(followers):
     with open(PREVIOUS_FOLLOWERS_FILE, 'w') as file:
         for follower in followers:
             file.write(follower + '\n')
-
 
 def load_new_followers():
     if os.path.exists(NEW_FOLLOWERS_FILE):
@@ -86,11 +84,9 @@ def load_new_followers():
             pass
     return {}
 
-
 def save_new_followers(new_followers):
     with open(NEW_FOLLOWERS_FILE, 'w') as file:
         json.dump(new_followers, file)
-
 
 def load_ignore_list():
     if os.path.exists(IGNORE_LIST_FILE):
@@ -98,6 +94,27 @@ def load_ignore_list():
             return file.read().splitlines()
     return []
 
+def get_suggested_users(current_following, current_followers):
+    suggested_users = set()
+    # Randomly select up to 20 users from your following list
+    num_following = min(len(current_following), 20)
+    limited_following = random.sample(current_following, num_following)
+    for user in limited_following:
+        # Get the users that this user is following, limit to first 20 users
+        following_url = f'https://api.github.com/users/{user}/following'
+        user_following = get_github_data(following_url, per_page=20, max_pages=1)
+        # Add to the set
+        suggested_users.update(user_following)
+    # Remove users you're already following or who are following you
+    suggested_users -= set(current_following)
+    suggested_users -= set(current_followers)
+    # Remove yourself
+    suggested_users.discard(GITHUB_USERNAME)
+    suggested_users = list(suggested_users)
+    # Limit to 25 random users
+    if len(suggested_users) > 25:
+        suggested_users = random.sample(suggested_users, 25)
+    return suggested_users
 
 @app.route('/')
 def index():
@@ -129,14 +146,15 @@ def index():
     save_followers(current_followers)
     save_new_followers(recent_new_followers)
 
+    suggested_users = get_suggested_users(current_following, current_followers)
+
     return render_template('index.html',
                            followers=current_followers,
                            following=current_following,
                            unfollowers=unfollowers,
                            not_following_back=not_following_back,
-                           new_followers=recent_new_followers.keys())
-
+                           new_followers=recent_new_followers.keys(),
+                           suggested_users=suggested_users)
 
 if __name__ == "__main__":
     app.run(debug=True)
-
