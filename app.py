@@ -11,56 +11,82 @@ app = Flask(__name__)
 GITHUB_USERNAME = config('GITHUB_USERNAME')
 GITHUB_TOKEN = config('GITHUB_TOKEN')
 
-FOLLOWERS_URL = f'https://api.github.com/users/{GITHUB_USERNAME}/followers'
-FOLLOWING_URL = f'https://api.github.com/users/{GITHUB_USERNAME}/following'
-
 headers = {
-    'Authorization': f'token {GITHUB_TOKEN}'
-} if GITHUB_TOKEN else {}
+    'Authorization': f'Bearer {GITHUB_TOKEN}',
+    'Content-Type': 'application/json'
+}
 
 PREVIOUS_FOLLOWERS_FILE = 'previous_followers.txt'
 NEW_FOLLOWERS_FILE = 'new_followers.json'
 IGNORE_LIST_FILE = 'ignore_list.txt'
 
-@app.route('/follow/<username>', methods=['POST'])
-def follow(username):
-    follow_url = f'https://api.github.com/user/following/{username}'
-    response = requests.put(follow_url, headers=headers)
+def execute_github_graphql_query(query, variables=None):
+    url = 'https://api.github.com/graphql'
+    payload = {'query': query, 'variables': variables or {}}
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+    result = response.json()
+    if 'errors' in result:
+        error_messages = '; '.join([error['message'] for error in result['errors']])
+        raise Exception(f"GraphQL query failed: {error_messages}")
+    return result
 
-    if response.status_code == 204:
-        return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
-    else:
-        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
+def get_followers_and_following():
+    followers = []
+    following = []
+    followers_cursor = None
+    following_cursor = None
 
-@app.route('/unfollow/<username>', methods=['POST'])
-def unfollow(username):
-    unfollow_url = f'https://api.github.com/user/following/{username}'
-    response = requests.delete(unfollow_url, headers=headers)
+    while True:
+        query = '''
+        query ($followersCursor: String, $followingCursor: String) {
+          viewer {
+            followers(first: 100, after: $followersCursor) {
+              nodes {
+                login
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+            following(first: 100, after: $followingCursor) {
+              nodes {
+                login
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        }
+        '''
+        variables = {
+            'followersCursor': followers_cursor,
+            'followingCursor': following_cursor
+        }
+        result = execute_github_graphql_query(query, variables)
+        viewer = result['data']['viewer']
 
-    if response.status_code == 204:
-        return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
-    else:
-        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
+        # Process followers
+        followers.extend([node['login'] for node in viewer['followers']['nodes']])
+        if viewer['followers']['pageInfo']['hasNextPage']:
+            followers_cursor = viewer['followers']['pageInfo']['endCursor']
+        else:
+            followers_cursor = None
 
-def get_github_data(url, per_page=100, max_pages=10):
-    data = []
-    page = 1
-    while page <= max_pages:
-        response = requests.get(url, headers=headers, params={'page': page, 'per_page': per_page})
-        if response.status_code == 403:
-            print("API rate limit exceeded.")
+        # Process following
+        following.extend([node['login'] for node in viewer['following']['nodes']])
+        if viewer['following']['pageInfo']['hasNextPage']:
+            following_cursor = viewer['following']['pageInfo']['endCursor']
+        else:
+            following_cursor = None
+
+        if not followers_cursor and not following_cursor:
             break
-        try:
-            response_data = response.json()
-            if not isinstance(response_data, list):
-                break
-            if not response_data:
-                break
-            data.extend([user['login'] for user in response_data])
-            page += 1
-        except json.JSONDecodeError:
-            break
-    return data
+
+    return followers, following
 
 def load_previous_followers():
     if os.path.exists(PREVIOUS_FOLLOWERS_FILE):
@@ -99,12 +125,15 @@ def get_suggested_users(current_following, current_followers):
     # Randomly select up to 20 users from your following list
     num_following = min(len(current_following), 20)
     limited_following = random.sample(current_following, num_following)
-    for user in limited_following:
-        # Get the users that this user is following, limit to first 20 users
-        following_url = f'https://api.github.com/users/{user}/following'
-        user_following = get_github_data(following_url, per_page=20, max_pages=1)
-        # Add to the set
-        suggested_users.update(user_following)
+
+    for user_login in limited_following:
+        try:
+            user_following = get_user_following(user_login)
+            suggested_users.update(user_following)
+        except Exception as e:
+            print(f"Skipping '{user_login}': {e}")
+            continue
+
     # Remove users you're already following or who are following you
     suggested_users -= set(current_following)
     suggested_users -= set(current_followers)
@@ -116,10 +145,119 @@ def get_suggested_users(current_following, current_followers):
         suggested_users = random.sample(suggested_users, 25)
     return suggested_users
 
+def get_user_following(username):
+    following = []
+    following_cursor = None
+
+    while True:
+        query = '''
+        query ($username: String!, $followingCursor: String) {
+          repositoryOwner(login: $username) {
+            __typename
+            ... on User {
+              following(first: 100, after: $followingCursor) {
+                nodes {
+                  login
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+              }
+            }
+          }
+        }
+        '''
+        variables = {
+            'username': username,
+            'followingCursor': following_cursor
+        }
+        try:
+            result = execute_github_graphql_query(query, variables)
+            repository_owner = result['data']['repositoryOwner']
+            if repository_owner is None:
+                # User or organization not found
+                print(f"'{username}' not found.")
+                break
+
+            if repository_owner['__typename'] != 'User':
+                # The login corresponds to an organization
+                print(f"'{username}' is an organization, skipping.")
+                break
+
+            following_data = repository_owner['following']
+            following.extend([node['login'] for node in following_data['nodes']])
+            if following_data['pageInfo']['hasNextPage']:
+                following_cursor = following_data['pageInfo']['endCursor']
+            else:
+                break
+        except Exception as e:
+            # Log the error and continue with the next user
+            print(f"Error fetching following for '{username}': {e}")
+            break
+
+    return following
+
+@app.route('/follow/<username>', methods=['POST'])
+def follow(username):
+    mutation = '''
+    mutation ($userId: ID!) {
+      followUser(input: {userId: $userId}) {
+        clientMutationId
+      }
+    }
+    '''
+    user_id = get_user_id(username)
+    if not user_id:
+        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
+    variables = {'userId': user_id}
+    try:
+        result = execute_github_graphql_query(mutation, variables)
+        return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
+    except Exception as e:
+        print(f"Error following '{username}': {e}")
+        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
+
+@app.route('/unfollow/<username>', methods=['POST'])
+def unfollow(username):
+    mutation = '''
+    mutation ($userId: ID!) {
+      unfollowUser(input: {userId: $userId}) {
+        clientMutationId
+      }
+    }
+    '''
+    user_id = get_user_id(username)
+    if not user_id:
+        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
+    variables = {'userId': user_id}
+    try:
+        result = execute_github_graphql_query(mutation, variables)
+        return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
+    except Exception as e:
+        print(f"Error unfollowing '{username}': {e}")
+        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
+
+def get_user_id(username):
+    query = '''
+    query ($username: String!) {
+      user(login: $username) {
+        id
+      }
+    }
+    '''
+    variables = {'username': username}
+    try:
+        result = execute_github_graphql_query(query, variables)
+        user = result['data']['user']
+        return user['id'] if user else None
+    except Exception as e:
+        print(f"Error fetching user ID for '{username}': {e}")
+        return None
+
 @app.route('/')
 def index():
-    current_followers = get_github_data(FOLLOWERS_URL)
-    current_following = get_github_data(FOLLOWING_URL)
+    current_followers, current_following = get_followers_and_following()
 
     previous_followers = load_previous_followers()
     stored_new_followers = load_new_followers()
