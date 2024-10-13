@@ -5,6 +5,7 @@ import random
 from flask import Flask, render_template, request
 from datetime import datetime, timedelta
 from decouple import config
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = Flask(__name__)
 
@@ -122,17 +123,19 @@ def load_ignore_list():
 
 def get_suggested_users(current_following, current_followers):
     suggested_users = set()
-    # Randomly select up to 20 users from your following list
-    num_following = min(len(current_following), 20)
-    limited_following = random.sample(current_following, num_following)
+    limited_following = current_following  # Use all users you are following
 
-    for user_login in limited_following:
-        try:
-            user_following = get_user_following(user_login)
-            suggested_users.update(user_following)
-        except Exception as e:
-            print(f"Skipping '{user_login}': {e}")
-            continue
+    # Use ThreadPoolExecutor to fetch following lists in parallel
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_user = {executor.submit(get_user_following, user_login): user_login for user_login in limited_following}
+        for future in as_completed(future_to_user):
+            user_login = future_to_user[future]
+            try:
+                user_following = future.result()
+                suggested_users.update(user_following)
+            except Exception as e:
+                print(f"Skipping '{user_login}': {e}")
+                continue
 
     # Remove users you're already following or who are following you
     suggested_users -= set(current_following)
@@ -140,7 +143,7 @@ def get_suggested_users(current_following, current_followers):
     # Remove yourself
     suggested_users.discard(GITHUB_USERNAME)
     suggested_users = list(suggested_users)
-    # Limit to 25 random users
+    # Randomly select 25 users from the suggested users
     if len(suggested_users) > 25:
         suggested_users = random.sample(suggested_users, 25)
     return suggested_users
