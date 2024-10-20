@@ -99,6 +99,8 @@ def get_followers_and_following():
             followers(first: 100, after: $followersCursor) {
               nodes {
                 login
+                __typename
+                id
               }
               pageInfo {
                 hasNextPage
@@ -108,6 +110,8 @@ def get_followers_and_following():
             following(first: 100, after: $followingCursor) {
               nodes {
                 login
+                __typename
+                id
               }
               pageInfo {
                 hasNextPage
@@ -128,15 +132,30 @@ def get_followers_and_following():
         result = execute_github_graphql_query(query, variables)
         viewer = result['data']['viewer']
 
-        # Process followers
-        followers.extend([node['login'] for node in viewer['followers']['nodes']])
+        # Process followers (only users with valid id)
+        followers.extend([
+            node['login']
+            for node in viewer['followers']['nodes']
+            if node['__typename'] == 'User' and node['id'] is not None
+        ])
         if viewer['followers']['pageInfo']['hasNextPage']:
             followers_cursor = viewer['followers']['pageInfo']['endCursor']
         else:
             followers_cursor = None
 
-        # Process following
-        following.extend([node['login'] for node in viewer['following']['nodes']])
+        # Process following (include both users and organizations with valid id)
+        for node in viewer['following']['nodes']:
+            if node['id'] is not None:
+                following.append({
+                    'login': node['login'],
+                    'type': node['__typename'],
+                    'id': node['id']
+                })
+            else:
+                logger.info(json.dumps({
+                    'action': 'Skipped non-existent account',
+                    'login': node['login']
+                }))
         if viewer['following']['pageInfo']['hasNextPage']:
             following_cursor = viewer['following']['pageInfo']['endCursor']
         else:
@@ -260,6 +279,7 @@ def get_multiple_users_following(user_logins):
                         following(first: 100) {{
                             nodes {{
                                 login
+                                __typename
                             }}
                             pageInfo {{
                                 hasNextPage
@@ -294,7 +314,11 @@ def get_multiple_users_following(user_logins):
                     user_login = user_data.get('login')
                     if user_login:
                         with lock:
-                            cache[user_login] = [node['login'] for node in following_nodes]
+                            cache[user_login] = [
+                                node['login']
+                                for node in following_nodes
+                                if node['__typename'] == 'User'
+                            ]
                             suggested_users.update(cache[user_login])
                             logger.debug(json.dumps({
                                 'action': 'Fetched following',
@@ -333,15 +357,16 @@ def get_multiple_users_following(user_logins):
     return suggested_users
 
 def get_suggested_users(current_following, current_followers):
-    # Use all following users
-    user_logins = current_following
+    # Use all following users (extract logins)
+    user_logins = [f['login'] for f in current_following if f['type'] == 'User']
     logger.info(json.dumps({
         'action': 'Fetching suggested users'
     }))
     suggested_users = get_multiple_users_following(user_logins)
 
     # Remove users you're already following or who are following you
-    suggested_users -= set(current_following)
+    current_following_logins = set([f['login'] for f in current_following])
+    suggested_users -= current_following_logins
     suggested_users -= set(current_followers)
     suggested_users.discard(GITHUB_USERNAME)
 
@@ -355,79 +380,129 @@ def get_suggested_users(current_following, current_followers):
     }))
     return suggested_users
 
-def get_user_id(username):
+def get_repository_owner_id(username):
     query = '''
     query ($username: String!) {
-      user(login: $username) {
+      repositoryOwner(login: $username) {
         id
+        __typename
       }
     }
     '''
     variables = {'username': username}
     try:
         result = execute_github_graphql_query(query, variables)
-        user = result['data']['user']
-        return user['id'] if user else None
+        owner = result['data']['repositoryOwner']
+        if owner:
+            return owner['id'], owner['__typename']
+        else:
+            return None, None
     except Exception as e:
         logger.error(json.dumps({
-            'action': 'Error fetching user ID',
+            'action': 'Error fetching repository owner ID',
             'username': username,
             'error': str(e)
         }))
-        return None
+        return None, None
 
 @app.route('/follow/<username>', methods=['POST'])
 def follow(username):
-    mutation = '''
+    owner_id, owner_type = get_repository_owner_id(username)
+    if not owner_id:
+        return json.dumps({'success': False, 'message': 'User not found'}), 400, {'ContentType': 'application/json'}
+
+    mutation_user = '''
     mutation ($userId: ID!) {
       followUser(input: {userId: $userId}) {
         clientMutationId
       }
     }
     '''
-    user_id = get_user_id(username)
-    if not user_id:
-        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
-    variables = {'userId': user_id}
+    mutation_org = '''
+    mutation ($organizationId: ID!) {
+      followOrganization(input: {organizationId: $organizationId}) {
+        clientMutationId
+      }
+    }
+    '''
+    if owner_type == 'User':
+        mutation = mutation_user
+        variables = {'userId': owner_id}
+    elif owner_type == 'Organization':
+        mutation = mutation_org
+        variables = {'organizationId': owner_id}
+    else:
+        return json.dumps({'success': False, 'message': 'Unsupported owner type'}), 400, {'ContentType': 'application/json'}
+
     try:
         result = execute_github_graphql_query(mutation, variables)
         logger.info(json.dumps({
-            'action': 'Successfully followed user',
-            'username': username
+            'action': 'Successfully followed',
+            'username': username,
+            'type': owner_type
         }))
         return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
     except Exception as e:
         logger.error(json.dumps({
-            'action': 'Error following user',
+            'action': 'Error following',
             'username': username,
+            'type': owner_type,
             'error': str(e)
         }))
         return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
 
 @app.route('/unfollow/<username>', methods=['POST'])
 def unfollow(username):
-    mutation = '''
+    # Find the user in current_following to get their id and type
+    current_followers, current_following = get_followers_and_following()
+    user_to_unfollow = next((user for user in current_following if user['login'] == username), None)
+    if not user_to_unfollow:
+        # Account doesn't exist or not in following list
+        return json.dumps({'success': False, 'message': 'User not found in following list'}), 400, {'ContentType': 'application/json'}
+
+    owner_id = user_to_unfollow['id']
+    owner_type = user_to_unfollow['type']
+
+    if owner_id is None:
+        # Cannot unfollow a non-existent account
+        return json.dumps({'success': False, 'message': 'Cannot unfollow a non-existent account'}), 400, {'ContentType': 'application/json'}
+
+    mutation_user = '''
     mutation ($userId: ID!) {
       unfollowUser(input: {userId: $userId}) {
         clientMutationId
       }
     }
     '''
-    user_id = get_user_id(username)
-    if not user_id:
-        return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
-    variables = {'userId': user_id}
+    mutation_org = '''
+    mutation ($organizationId: ID!) {
+      unfollowOrganization(input: {organizationId: $organizationId}) {
+        clientMutationId
+      }
+    }
+    '''
+    if owner_type == 'User':
+        mutation = mutation_user
+        variables = {'userId': owner_id}
+    elif owner_type == 'Organization':
+        mutation = mutation_org
+        variables = {'organizationId': owner_id}
+    else:
+        return json.dumps({'success': False, 'message': 'Unsupported owner type'}), 400, {'ContentType': 'application/json'}
+
     try:
         result = execute_github_graphql_query(mutation, variables)
         logger.info(json.dumps({
-            'action': 'Successfully unfollowed user',
-            'username': username
+            'action': 'Successfully unfollowed',
+            'username': username,
+            'type': owner_type
         }))
         return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
     except Exception as e:
         logger.error(json.dumps({
-            'action': 'Error unfollowing user',
+            'action': 'Error unfollowing',
             'username': username,
+            'type': owner_type,
             'error': str(e)
         }))
         return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
@@ -443,10 +518,18 @@ def index():
     stored_new_followers = load_new_followers()
     ignore_list = load_ignore_list()
 
-    unfollowers = list(set(previous_followers) - set(current_followers))
-    not_following_back = list(set(current_following) - set(current_followers))
-    new_followers = list(set(current_followers) - set(previous_followers))
+    # Extract logins
+    current_follower_logins = set(current_followers)
+    current_following_logins = set([f['login'] for f in current_following])
 
+    unfollowers = list(set(previous_followers) - current_follower_logins)
+    not_following_back = [
+        f['login'] for f in current_following
+        if f['login'] not in current_follower_logins and f['type'] == 'User' and f['id'] is not None
+    ]
+    new_followers = list(current_follower_logins - set(previous_followers))
+
+    # Apply ignore list
     unfollowers = [user for user in unfollowers if user not in ignore_list]
     not_following_back = [user for user in not_following_back if user not in ignore_list]
     new_followers = [user for user in new_followers if user not in ignore_list]
