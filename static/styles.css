@@ -32,13 +32,16 @@ h2 {
     cursor: pointer;
 }
 
+.collapsible-section {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.4s ease-out;
+}
+
 .collapsible-list {
     list-style-type: none;
     padding: 0;
     margin: 0;
-    overflow: hidden;
-    max-height: 0;
-    transition: max-height 0.4s ease-out;
 }
 
 li {
@@ -67,7 +70,7 @@ li:hover {
     font-size: 1.2rem;
     border-radius: 5px;
     text-decoration: none;
-    margin-top: 20px;
+    margin-top: 10px;
     transition: background 0.3s ease;
 }
 
