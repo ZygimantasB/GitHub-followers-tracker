@@ -86,13 +86,15 @@ def execute_github_graphql_query(query, variables=None):
         }))
         raise
 
-def get_followers():
+def get_followers_and_following():
     followers = []
+    following = []
     followers_cursor = None
+    following_cursor = None
 
     while True:
         query = '''
-        query ($followersCursor: String) {
+        query ($followersCursor: String, $followingCursor: String) {
           viewer {
             followers(first: 100, after: $followersCursor) {
               nodes {
@@ -105,45 +107,6 @@ def get_followers():
                 endCursor
               }
             }
-          }
-        }
-        '''
-        variables = {
-            'followersCursor': followers_cursor,
-        }
-        logger.debug(json.dumps({
-            'action': 'Fetching followers',
-            'variables': variables
-        }))
-        result = execute_github_graphql_query(query, variables)
-        viewer = result['data']['viewer']
-
-        # Process followers (only users with valid id)
-        followers.extend([
-            node['login']
-            for node in viewer['followers']['nodes']
-            if node['__typename'] == 'User' and node['id'] is not None
-        ])
-        if viewer['followers']['pageInfo']['hasNextPage']:
-            followers_cursor = viewer['followers']['pageInfo']['endCursor']
-        else:
-            break
-
-    logger.info(json.dumps({
-        'action': 'Fetched followers',
-        'total_followers': len(followers),
-    }))
-
-    return followers
-
-def get_following():
-    following = []
-    following_cursor = None
-
-    while True:
-        query = '''
-        query ($followingCursor: String) {
-          viewer {
             following(first: 100, after: $followingCursor) {
               nodes {
                 login
@@ -159,14 +122,26 @@ def get_following():
         }
         '''
         variables = {
+            'followersCursor': followers_cursor,
             'followingCursor': following_cursor
         }
         logger.debug(json.dumps({
-            'action': 'Fetching following',
+            'action': 'Fetching followers and following',
             'variables': variables
         }))
         result = execute_github_graphql_query(query, variables)
         viewer = result['data']['viewer']
+
+        # Process followers (only users with valid id)
+        followers.extend([
+            node['login']
+            for node in viewer['followers']['nodes']
+            if node['__typename'] == 'User' and node['id'] is not None
+        ])
+        if viewer['followers']['pageInfo']['hasNextPage']:
+            followers_cursor = viewer['followers']['pageInfo']['endCursor']
+        else:
+            followers_cursor = None
 
         # Process following (include both users and organizations with valid id)
         for node in viewer['following']['nodes']:
@@ -184,14 +159,18 @@ def get_following():
         if viewer['following']['pageInfo']['hasNextPage']:
             following_cursor = viewer['following']['pageInfo']['endCursor']
         else:
+            following_cursor = None
+
+        if not followers_cursor and not following_cursor:
             break
 
     logger.info(json.dumps({
-        'action': 'Fetched following',
+        'action': 'Fetched followers and following',
+        'total_followers': len(followers),
         'total_following': len(following)
     }))
 
-    return following
+    return followers, following
 
 def load_previous_followers():
     if os.path.exists(PREVIOUS_FOLLOWERS_FILE):
@@ -377,9 +356,7 @@ def get_multiple_users_following(user_logins):
     save_cache(cache)
     return suggested_users
 
-def get_suggested_users():
-    current_following = get_following()
-    current_followers = get_followers()
+def get_suggested_users(current_following, current_followers):
     # Use all following users (extract logins)
     user_logins = [f['login'] for f in current_following if f['type'] == 'User']
     logger.info(json.dumps({
@@ -402,58 +379,6 @@ def get_suggested_users():
         'count': len(suggested_users)
     }))
     return suggested_users
-
-def get_new_followers():
-    current_followers = get_followers()
-    previous_followers = load_previous_followers()
-    stored_new_followers = load_new_followers()
-    ignore_list = load_ignore_list()
-
-    current_follower_logins = set(current_followers)
-
-    new_followers = list(current_follower_logins - set(previous_followers))
-    new_followers = [user for user in new_followers if user not in ignore_list]
-
-    current_time = datetime.now()
-    for follower in new_followers:
-        if follower not in stored_new_followers:
-            stored_new_followers[follower] = current_time.isoformat()
-
-    recent_new_followers = {
-        user: timestamp for user, timestamp in stored_new_followers.items()
-        if datetime.fromisoformat(timestamp) >= current_time - timedelta(days=3)
-    }
-
-    save_followers(current_followers)
-    save_new_followers(recent_new_followers)
-
-    return list(recent_new_followers.keys())
-
-def get_unfollowers():
-    current_followers = get_followers()
-    previous_followers = load_previous_followers()
-    ignore_list = load_ignore_list()
-
-    current_follower_logins = set(current_followers)
-
-    unfollowers = list(set(previous_followers) - current_follower_logins)
-    unfollowers = [user for user in unfollowers if user not in ignore_list]
-
-    return unfollowers
-
-def get_not_following_back():
-    current_followers = get_followers()
-    current_following = get_following()
-    ignore_list = load_ignore_list()
-
-    current_follower_logins = set(current_followers)
-    not_following_back = [
-        f['login'] for f in current_following
-        if f['login'] not in current_follower_logins and f['type'] == 'User' and f['id'] is not None
-    ]
-    not_following_back = [user for user in not_following_back if user not in ignore_list]
-
-    return not_following_back
 
 def get_repository_owner_id(username):
     query = '''
@@ -572,6 +497,108 @@ def unfollow(username):
         }))
         return json.dumps({'success': False}), 400, {'ContentType': 'application/json'}
 
+@app.route('/bulk_follow', methods=['POST'])
+def bulk_follow():
+    usernames = request.json.get('usernames', [])
+    results = {}
+    for username in usernames:
+        try:
+            owner_id, owner_type = get_repository_owner_id(username)
+            if not owner_id:
+                results[username] = {'success': False, 'message': 'User not found'}
+                continue
+
+            mutation_user = '''
+            mutation ($userId: ID!) {
+              followUser(input: {userId: $userId}) {
+                clientMutationId
+              }
+            }
+            '''
+            mutation_org = '''
+            mutation ($organizationId: ID!) {
+              followOrganization(input: {organizationId: $organizationId}) {
+                clientMutationId
+              }
+            }
+            '''
+            if owner_type == 'User':
+                mutation = mutation_user
+                variables = {'userId': owner_id}
+            elif owner_type == 'Organization':
+                mutation = mutation_org
+                variables = {'organizationId': owner_id}
+            else:
+                results[username] = {'success': False, 'message': 'Unsupported owner type'}
+                continue
+
+            result = execute_github_graphql_query(mutation, variables)
+            logger.info(json.dumps({
+                'action': 'Successfully followed',
+                'username': username,
+                'type': owner_type
+            }))
+            results[username] = {'success': True}
+        except Exception as e:
+            logger.error(json.dumps({
+                'action': 'Error following',
+                'username': username,
+                'error': str(e)
+            }))
+            results[username] = {'success': False, 'message': str(e)}
+    return json.dumps(results), 200, {'ContentType': 'application/json'}
+
+@app.route('/bulk_unfollow', methods=['POST'])
+def bulk_unfollow():
+    usernames = request.json.get('usernames', [])
+    results = {}
+    for username in usernames:
+        try:
+            owner_id, owner_type = get_repository_owner_id(username)
+            if not owner_id:
+                results[username] = {'success': False, 'message': 'User not found'}
+                continue
+
+            mutation_user = '''
+            mutation ($userId: ID!) {
+              unfollowUser(input: {userId: $userId}) {
+                clientMutationId
+              }
+            }
+            '''
+            mutation_org = '''
+            mutation ($organizationId: ID!) {
+              unfollowOrganization(input: {organizationId: $organizationId}) {
+                clientMutationId
+              }
+            }
+            '''
+            if owner_type == 'User':
+                mutation = mutation_user
+                variables = {'userId': owner_id}
+            elif owner_type == 'Organization':
+                mutation = mutation_org
+                variables = {'organizationId': owner_id}
+            else:
+                results[username] = {'success': False, 'message': 'Unsupported owner type'}
+                continue
+
+            result = execute_github_graphql_query(mutation, variables)
+            logger.info(json.dumps({
+                'action': 'Successfully unfollowed',
+                'username': username,
+                'type': owner_type
+            }))
+            results[username] = {'success': True}
+        except Exception as e:
+            logger.error(json.dumps({
+                'action': 'Error unfollowing',
+                'username': username,
+                'error': str(e)
+            }))
+            results[username] = {'success': False, 'message': str(e)}
+    return json.dumps(results), 200, {'ContentType': 'application/json'}
+
 @app.route('/')
 def index():
     logger.info(json.dumps({
@@ -579,35 +606,79 @@ def index():
     }))
     return render_template('index.html')
 
-@app.route('/get_followers')
-def get_followers_route():
-    followers = get_followers()
-    return json.dumps({'followers': followers}), 200, {'ContentType': 'application/json'}
+@app.route('/get_data')
+def get_data():
+    data_type = request.args.get('type')
+    logger.info(json.dumps({
+        'action': 'Fetching data via get_data route',
+        'data_type': data_type
+    }))
 
-@app.route('/get_following')
-def get_following_route():
-    following = get_following()
-    return json.dumps({'following': following}), 200, {'ContentType': 'application/json'}
+    # Load necessary data files
+    previous_followers = load_previous_followers()
+    stored_new_followers = load_new_followers()
+    ignore_list = load_ignore_list()
 
-@app.route('/get_new_followers')
-def get_new_followers_route():
-    new_followers = get_new_followers()
-    return json.dumps({'new_followers': new_followers}), 200, {'ContentType': 'application/json'}
+    current_time = datetime.now()
 
-@app.route('/get_unfollowers')
-def get_unfollowers_route():
-    unfollowers = get_unfollowers()
-    return json.dumps({'unfollowers': unfollowers}), 200, {'ContentType': 'application/json'}
-
-@app.route('/get_not_following_back')
-def get_not_following_back_route():
-    not_following_back = get_not_following_back()
-    return json.dumps({'not_following_back': not_following_back}), 200, {'ContentType': 'application/json'}
-
-@app.route('/get_suggested_users')
-def get_suggested_users_route():
-    suggested_users = get_suggested_users()
-    return json.dumps({'suggested_users': suggested_users}), 200, {'ContentType': 'application/json'}
+    # Now, depending on data_type, fetch the appropriate data
+    if data_type == 'followers':
+        current_followers, _ = get_followers_and_following()
+        # Apply ignore list
+        current_followers = [user for user in current_followers if user not in ignore_list]
+        data = {'followers': current_followers}
+        return json.dumps(data), 200, {'ContentType': 'application/json'}
+    elif data_type == 'following':
+        _, current_following = get_followers_and_following()
+        # Apply ignore list
+        current_following = [f for f in current_following if f['login'] not in ignore_list]
+        data = {'following': current_following}
+        return json.dumps(data), 200, {'ContentType': 'application/json'}
+    elif data_type == 'new_followers':
+        current_followers, _ = get_followers_and_following()
+        current_follower_logins = set(current_followers)
+        new_followers = list(current_follower_logins - set(previous_followers))
+        # Apply ignore list
+        new_followers = [user for user in new_followers if user not in ignore_list]
+        # Update stored_new_followers
+        for follower in new_followers:
+            if follower not in stored_new_followers:
+                stored_new_followers[follower] = current_time.isoformat()
+        recent_new_followers = {
+            user: timestamp for user, timestamp in stored_new_followers.items()
+            if datetime.fromisoformat(timestamp) >= current_time - timedelta(days=3)
+        }
+        save_new_followers(recent_new_followers)
+        data = {'new_followers': list(recent_new_followers.keys())}
+        return json.dumps(data), 200, {'ContentType': 'application/json'}
+    elif data_type == 'unfollowers':
+        current_followers, _ = get_followers_and_following()
+        current_follower_logins = set(current_followers)
+        unfollowers = list(set(previous_followers) - current_follower_logins)
+        # Apply ignore list
+        unfollowers = [user for user in unfollowers if user not in ignore_list]
+        data = {'unfollowers': unfollowers}
+        return json.dumps(data), 200, {'ContentType': 'application/json'}
+    elif data_type == 'not_following_back':
+        current_followers, current_following = get_followers_and_following()
+        current_follower_logins = set(current_followers)
+        not_following_back = [
+            f['login'] for f in current_following
+            if f['login'] not in current_follower_logins and f['type'] == 'User' and f['id'] is not None
+        ]
+        # Apply ignore list
+        not_following_back = [user for user in not_following_back if user not in ignore_list]
+        data = {'not_following_back': not_following_back}
+        return json.dumps(data), 200, {'ContentType': 'application/json'}
+    elif data_type == 'suggested_users':
+        current_followers, current_following = get_followers_and_following()
+        suggested_users = get_suggested_users(current_following, current_followers)
+        # Apply ignore list
+        suggested_users = [user for user in suggested_users if user not in ignore_list]
+        data = {'suggested_users': suggested_users}
+        return json.dumps(data), 200, {'ContentType': 'application/json'}
+    else:
+        return json.dumps({'error': 'Invalid data type requested'}), 400, {'ContentType': 'application/json'}
 
 if __name__ == "__main__":
     app.run(debug=True)
