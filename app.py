@@ -512,6 +512,13 @@ def index():
     logger.info(json.dumps({
         'action': 'Loading index page'
     }))
+    return render_template('index.html')
+
+@app.route('/get_data')
+def get_data():
+    logger.info(json.dumps({
+        'action': 'Fetching data via get_data route'
+    }))
     current_followers, current_following = get_followers_and_following()
 
     previous_followers = load_previous_followers()
@@ -549,13 +556,16 @@ def index():
 
     suggested_users = get_suggested_users(current_following, current_followers)
 
-    return render_template('index.html',
-                           followers=current_followers,
-                           following=current_following,
-                           unfollowers=unfollowers,
-                           not_following_back=not_following_back,
-                           new_followers=recent_new_followers.keys(),
-                           suggested_users=suggested_users)
+    # Return the data as JSON
+    data = {
+        'followers': current_followers,
+        'following': current_following,
+        'unfollowers': unfollowers,
+        'not_following_back': not_following_back,
+        'new_followers': list(recent_new_followers.keys()),
+        'suggested_users': suggested_users
+    }
+    return json.dumps(data), 200, {'ContentType': 'application/json'}
 
 if __name__ == "__main__":
     app.run(debug=True)
