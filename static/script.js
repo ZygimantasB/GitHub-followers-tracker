@@ -1,5 +1,5 @@
 function toggleVisibility(id) {
-    var element = document.getElementById(id);
+    const element = document.getElementById(id);
     if (element.style.maxHeight) {
         element.style.maxHeight = null;
     } else {
@@ -12,160 +12,116 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.load-data-button').forEach(button => {
         button.addEventListener('click', function() {
             const dataType = this.getAttribute('data-type');
-            fetch(`/get_data?type=${dataType}`)
-                .then(response => response.json())
-                .then(data => {
-                    populateData(dataType, data);
-                })
-                .catch(error => {
-                    console.error('Error fetching data:', error);
-                });
+            fetchData(dataType);
         });
     });
 
-    // Handle Follow All button for Suggested Users
+    // Fetch data function using async/await
+    async function fetchData(dataType) {
+        try {
+            const response = await fetch(`/get_data?type=${dataType}`);
+            const data = await response.json();
+            populateData(dataType, data);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
+    }
+
+    // Handle bulk follow/unfollow buttons
     document.getElementById('follow-all-suggested-users-button').addEventListener('click', function() {
-        const suggestedUsersList = document.getElementById('suggested-users-list');
-        const usernames = [];
-        suggestedUsersList.querySelectorAll('.list-item').forEach(li => {
-            const username = li.querySelector('span').textContent;
-            usernames.push(username);
-        });
-        if (usernames.length > 0) {
-            fetch('/bulk_follow', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ usernames: usernames })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    // Handle results
-                    console.log('Bulk follow results:', data);
-                    usernames.forEach(username => {
-                        if (data[username] && data[username].success) {
-                            // Remove the user from the list or update UI
-                            const li = suggestedUsersList.querySelector(`.list-item[data-username="${username}"]`);
-                            if (li) {
-                                li.style.display = 'none';
-                            }
-                        }
-                    });
-                })
-                .catch(error => {
-                    console.error('Error during bulk follow:', error);
-                });
-        }
+        bulkAction('suggested-users-list', '/bulk_follow');
     });
 
-    // Handle Unfollow All button for Not Following Back
     document.getElementById('unfollow-all-not-following-back-button').addEventListener('click', function() {
-        const list = document.getElementById('not-following-back-list');
-        const usernames = [];
-        list.querySelectorAll('.list-item').forEach(li => {
-            const username = li.querySelector('span').textContent;
-            usernames.push(username);
-        });
-        if (usernames.length > 0) {
-            fetch('/bulk_unfollow', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ usernames: usernames })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    // Handle results
-                    console.log('Bulk unfollow results:', data);
-                    usernames.forEach(username => {
-                        if (data[username] && data[username].success) {
-                            // Remove the user from the list or update UI
-                            const li = list.querySelector(`.list-item[data-username="${username}"]`);
-                            if (li) {
-                                li.style.display = 'none';
-                            }
-                        }
-                    });
-                })
-                .catch(error => {
-                    console.error('Error during bulk unfollow:', error);
-                });
-        }
+        bulkAction('not-following-back-list', '/bulk_unfollow');
     });
 
-    // Handle Unfollow All button for Unfollowers
     document.getElementById('unfollow-all-unfollowers-button').addEventListener('click', function() {
-        const list = document.getElementById('unfollowers-list');
-        const usernames = [];
-        list.querySelectorAll('.list-item').forEach(li => {
-            const username = li.querySelector('span').textContent;
-            usernames.push(username);
-        });
-        if (usernames.length > 0) {
-            fetch('/bulk_unfollow', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ usernames: usernames })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    // Handle results
-                    console.log('Bulk unfollow results:', data);
-                    usernames.forEach(username => {
-                        if (data[username] && data[username].success) {
-                            // Remove the user from the list or update UI
-                            const li = list.querySelector(`.list-item[data-username="${username}"]`);
-                            if (li) {
-                                li.style.display = 'none';
-                            }
-                        }
-                    });
-                })
-                .catch(error => {
-                    console.error('Error during bulk unfollow:', error);
-                });
-        }
+        bulkAction('unfollowers-list', '/bulk_unfollow');
     });
+
+    async function bulkAction(listId, endpoint) {
+        const list = document.getElementById(listId);
+        const usernames = Array.from(list.querySelectorAll('.list-item span')).map(span => span.textContent);
+        if (usernames.length > 0) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ usernames: usernames })
+                });
+                const results = await response.json();
+                usernames.forEach(username => {
+                    if (results[username] && results[username].success) {
+                        const li = list.querySelector(`.list-item[data-username="${username}"]`);
+                        if (li) {
+                            li.style.display = 'none';
+                        }
+                    } else {
+                        console.error(`Failed to process ${username}: ${results[username].message}`);
+                    }
+                });
+            } catch (error) {
+                console.error('Error during bulk action:', error);
+            }
+        }
+    }
 
     function populateData(dataType, data) {
-        if (dataType === 'followers') {
-            // Update counts
-            document.getElementById('followers-count').textContent = data.followers.length;
-            // Populate followers
-            const followersList = document.getElementById('followers-list');
-            followersList.innerHTML = '';
-            data.followers.forEach(follower => {
-                const li = document.createElement('li');
-                li.textContent = follower;
-                li.className = 'list-item';
-                li.dataset.username = follower;
-                followersList.appendChild(li);
-            });
-        } else if (dataType === 'following') {
-            // Update counts
-            document.getElementById('following-count').textContent = data.following.length;
-            // Populate following
-            const followingList = document.getElementById('following-list');
-            followingList.innerHTML = '';
-            data.following.forEach(follow => {
-                const li = document.createElement('li');
-                const span = document.createElement('span');
-                span.textContent = follow.login;
-                li.appendChild(span);
+        const counts = {
+            'followers': 'followers-count',
+            'following': 'following-count',
+            'new_followers': 'new-followers-count',
+            'unfollowers': 'unfollowers-count',
+            'not_following_back': 'not-following-back-count',
+            'suggested_users': 'suggested-users-count'
+        };
 
-                const buttonGroup = document.createElement('div');
-                buttonGroup.className = 'button-group';
+        const lists = {
+            'followers': 'followers-list',
+            'following': 'following-list',
+            'new_followers': 'new-followers-list',
+            'unfollowers': 'unfollowers-list',
+            'not_following_back': 'not-following-back-list',
+            'suggested_users': 'suggested-users-list'
+        };
 
-                // Since we don't have followers data here, omit the check
+        const dataKeys = {
+            'followers': 'followers',
+            'following': 'following',
+            'new_followers': 'new_followers',
+            'unfollowers': 'unfollowers',
+            'not_following_back': 'not_following_back',
+            'suggested_users': 'suggested_users'
+        };
+
+        const countElement = document.getElementById(counts[dataType]);
+        const listElement = document.getElementById(lists[dataType]);
+        const dataList = data[dataKeys[dataType]];
+
+        // Update counts
+        countElement.textContent = dataList.length;
+        // Clear existing list
+        listElement.innerHTML = '';
+
+        dataList.forEach(item => {
+            const li = document.createElement('li');
+            const span = document.createElement('span');
+            span.textContent = item.login || item;
+            li.appendChild(span);
+            li.className = 'list-item';
+            li.dataset.username = item.login || item;
+
+            const buttonGroup = document.createElement('div');
+            buttonGroup.className = 'button-group';
+
+            if (['following', 'not_following_back', 'unfollowers'].includes(dataType)) {
                 const unfollowForm = document.createElement('form');
-                unfollowForm.action = '/unfollow/' + follow.login;
+                unfollowForm.action = `/unfollow/${item.login || item}`;
                 unfollowForm.method = 'post';
                 unfollowForm.className = 'unfollow-form';
-                unfollowForm.style.display = 'inline';
 
                 const unfollowButton = document.createElement('button');
                 unfollowButton.type = 'submit';
@@ -174,34 +130,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 unfollowForm.appendChild(unfollowButton);
                 buttonGroup.appendChild(unfollowForm);
+            }
 
-                li.appendChild(buttonGroup);
-                li.className = 'list-item';
-                li.dataset.username = follow.login;
-                followingList.appendChild(li);
-            });
-            addFormEventListeners();
-        } else if (dataType === 'new_followers') {
-            // Update counts
-            document.getElementById('new-followers-count').textContent = data.new_followers.length;
-            // Populate new followers
-            const newFollowersList = document.getElementById('new-followers-list');
-            newFollowersList.innerHTML = '';
-            data.new_followers.forEach(newFollower => {
-                const li = document.createElement('li');
-                const span = document.createElement('span');
-                span.textContent = newFollower;
-                li.appendChild(span);
-
-                const buttonGroup = document.createElement('div');
-                buttonGroup.className = 'button-group';
-
-                // Since we don't have following data here, just add follow button
+            if (['new_followers', 'suggested_users'].includes(dataType)) {
                 const followForm = document.createElement('form');
-                followForm.action = '/follow/' + newFollower;
+                followForm.action = `/follow/${item.login || item}`;
                 followForm.method = 'post';
                 followForm.className = 'follow-form';
-                followForm.style.display = 'inline';
 
                 const followButton = document.createElement('button');
                 followButton.type = 'submit';
@@ -210,119 +145,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 followForm.appendChild(followButton);
                 buttonGroup.appendChild(followForm);
+            }
 
+            if (buttonGroup.childElementCount > 0) {
                 li.appendChild(buttonGroup);
-                li.className = 'list-item';
-                li.dataset.username = newFollower;
-                newFollowersList.appendChild(li);
-            });
-            addFormEventListeners();
-        } else if (dataType === 'unfollowers') {
-            // Update counts
-            document.getElementById('unfollowers-count').textContent = data.unfollowers.length;
-            // Populate unfollowers
-            const unfollowersList = document.getElementById('unfollowers-list');
-            unfollowersList.innerHTML = '';
-            data.unfollowers.forEach(unfollower => {
-                const li = document.createElement('li');
-                const span = document.createElement('span');
-                span.textContent = unfollower;
-                li.appendChild(span);
+            }
 
-                const buttonGroup = document.createElement('div');
-                buttonGroup.className = 'button-group';
+            listElement.appendChild(li);
+        });
 
-                const unfollowForm = document.createElement('form');
-                unfollowForm.action = '/unfollow/' + unfollower;
-                unfollowForm.method = 'post';
-                unfollowForm.className = 'unfollow-form';
-                unfollowForm.style.display = 'inline';
-
-                const unfollowButton = document.createElement('button');
-                unfollowButton.type = 'submit';
-                unfollowButton.className = 'btn-unfollow';
-                unfollowButton.textContent = 'Unfollow';
-
-                unfollowForm.appendChild(unfollowButton);
-                buttonGroup.appendChild(unfollowForm);
-
-                li.appendChild(buttonGroup);
-                li.className = 'list-item';
-                li.dataset.username = unfollower;
-                unfollowersList.appendChild(li);
-            });
-            addFormEventListeners();
-        } else if (dataType === 'not_following_back') {
-            // Update counts
-            document.getElementById('not-following-back-count').textContent = data.not_following_back.length;
-            // Populate not following back
-            const list = document.getElementById('not-following-back-list');
-            list.innerHTML = '';
-            data.not_following_back.forEach(user => {
-                const li = document.createElement('li');
-                const span = document.createElement('span');
-                span.textContent = user;
-                li.appendChild(span);
-
-                const buttonGroup = document.createElement('div');
-                buttonGroup.className = 'button-group';
-
-                const unfollowForm = document.createElement('form');
-                unfollowForm.action = '/unfollow/' + user;
-                unfollowForm.method = 'post';
-                unfollowForm.className = 'unfollow-form';
-                unfollowForm.style.display = 'inline';
-
-                const unfollowButton = document.createElement('button');
-                unfollowButton.type = 'submit';
-                unfollowButton.className = 'btn-unfollow';
-                unfollowButton.textContent = 'Unfollow';
-
-                unfollowForm.appendChild(unfollowButton);
-                buttonGroup.appendChild(unfollowForm);
-
-                li.appendChild(buttonGroup);
-                li.className = 'list-item';
-                li.dataset.username = user;
-                list.appendChild(li);
-            });
-            addFormEventListeners();
-        } else if (dataType === 'suggested_users') {
-            // Update counts
-            document.getElementById('suggested-users-count').textContent = data.suggested_users.length;
-            // Populate suggested users
-            const suggestedUsersList = document.getElementById('suggested-users-list');
-            suggestedUsersList.innerHTML = '';
-            data.suggested_users.forEach(user => {
-                const li = document.createElement('li');
-                const span = document.createElement('span');
-                span.textContent = user;
-                li.appendChild(span);
-
-                const buttonGroup = document.createElement('div');
-                buttonGroup.className = 'button-group';
-
-                const followForm = document.createElement('form');
-                followForm.action = '/follow/' + user;
-                followForm.method = 'post';
-                followForm.className = 'follow-form';
-                followForm.style.display = 'inline';
-
-                const followButton = document.createElement('button');
-                followButton.type = 'submit';
-                followButton.className = 'btn-follow';
-                followButton.textContent = 'Follow';
-
-                followForm.appendChild(followButton);
-                buttonGroup.appendChild(followForm);
-
-                li.appendChild(buttonGroup);
-                li.className = 'list-item';
-                li.dataset.username = user;
-                suggestedUsersList.appendChild(li);
-            });
-            addFormEventListeners();
-        }
+        addFormEventListeners();
     }
 
     function addFormEventListeners() {

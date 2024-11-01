@@ -10,6 +10,7 @@ cache
 ignore_list.txt
 new_followers.json
 previous_followers.txt
+app.log.*
 
 # User-specific stuff
 .idea/**/workspace.xml
