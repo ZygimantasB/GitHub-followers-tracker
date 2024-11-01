@@ -26,31 +26,22 @@ GITHUB_USERNAME = config('GITHUB_USERNAME')
 
 LOG_FILE = 'app.log'
 
-# Set up structured logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-# Create handlers
-console_handler = logging.StreamHandler()
-file_handler = RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=2)
-
-# Create formatters
-formatter = logging.Formatter(
-    '{"time": "%(asctime)s", "level": "%(levelname)s", "message": %(message)s}'
+# Set up logging configuration
+logging.basicConfig(
+    level=logging.DEBUG,  # Set the logging level
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',  # Log message format
+    handlers=[
+        RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=2),  # File handler with rotation
+        logging.StreamHandler()  # Console output handler
+    ]
 )
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
 
-# Add handlers to logger
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
-
+logger = logging.getLogger(__name__)
 
 @app.route('/')
 def index():
     logger.info('Loading index page')
     return render_template('index.html')
-
 
 @app.route('/get_data')
 def get_data():
@@ -121,40 +112,44 @@ def get_data():
         data = {'suggested_users': suggested_users}
         return jsonify(data)
     else:
+        logger.error(f'Invalid data type requested: {data_type}')
         return jsonify({'error': 'Invalid data type requested'}), 400
-
 
 @app.route('/follow/<username>', methods=['POST'])
 def follow(username):
+    logger.info(f'Attempting to follow {username}')
     success, message = follow_user(username)
     if success:
+        logger.info(f'Successfully followed {username}')
         return jsonify({'success': True})
     else:
+        logger.error(f'Failed to follow {username}: {message}')
         return jsonify({'success': False, 'message': message}), 400
-
 
 @app.route('/unfollow/<username>', methods=['POST'])
 def unfollow(username):
+    logger.info(f'Attempting to unfollow {username}')
     success, message = unfollow_user(username)
     if success:
+        logger.info(f'Successfully unfollowed {username}')
         return jsonify({'success': True})
     else:
+        logger.error(f'Failed to unfollow {username}: {message}')
         return jsonify({'success': False, 'message': message}), 400
-
 
 @app.route('/bulk_follow', methods=['POST'])
 def bulk_follow():
     usernames = request.json.get('usernames', [])
+    logger.info(f'Attempting to bulk follow users: {usernames}')
     results = bulk_follow_users(usernames)
     return jsonify(results)
-
 
 @app.route('/bulk_unfollow', methods=['POST'])
 def bulk_unfollow():
     usernames = request.json.get('usernames', [])
+    logger.info(f'Attempting to bulk unfollow users: {usernames}')
     results = bulk_unfollow_users(usernames)
     return jsonify(results)
-
 
 if __name__ == "__main__":
     app.run(debug=True)
