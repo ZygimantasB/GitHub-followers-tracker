@@ -69,11 +69,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function fetchData(dataType) {
         try {
+            showLoadingIndicator();
             const response = await fetch(`/get_data?type=${dataType}`);
             const data = await response.json();
             populateData(dataType, data);
         } catch (error) {
             console.error('Error fetching data:', error);
+        } finally {
+            hideLoadingIndicator();
         }
     }
 
@@ -82,6 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const usernames = Array.from(list.querySelectorAll('.list-item .username')).map(span => span.textContent);
         if (usernames.length > 0) {
             try {
+                showLoadingIndicator();
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
@@ -102,6 +106,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             } catch (error) {
                 console.error('Error during bulk action:', error);
+            } finally {
+                hideLoadingIndicator();
             }
         }
     }
@@ -112,6 +118,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const usernames = Array.from(selectedCheckboxes).map(checkbox => checkbox.dataset.username);
         if (usernames.length > 0) {
             try {
+                showLoadingIndicator();
                 const response = await fetch('/bulk_follow', {
                     method: 'POST',
                     headers: {
@@ -132,6 +139,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             } catch (error) {
                 console.error('Error during following selected users:', error);
+            } finally {
+                hideLoadingIndicator();
             }
         } else {
             alert('No users selected.');
@@ -305,5 +314,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             });
         });
+    }
+
+    function showLoadingIndicator() {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        loadingIndicator.style.display = 'block';
+    }
+
+    function hideLoadingIndicator() {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        loadingIndicator.style.display = 'none';
     }
 });

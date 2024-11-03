@@ -224,3 +224,11 @@ h2 button:hover {
     text-align: center;
     font-size: 1.2em;
 }
+
+/* Loading Indicator Styling */
+.loading-indicator {
+    text-align: center;
+    font-size: 1.2em;
+    color: #00e676;
+    margin-top: 20px;
+}
