@@ -155,3 +155,25 @@ h2 button {
 h2 button:hover {
     background: #666;
 }
+
+/* User Info Styling */
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-info .username {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+/* Checkbox styling */
+.list-item input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.counts {
+    font-size: 0.9em;
+    color: #bbb;
+    margin-left: 5px;
+}

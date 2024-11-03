@@ -5,11 +5,13 @@ from decouple import config
 from github_api import (
     get_followers,
     get_following,
-    get_suggested_users,
     follow_user,
     unfollow_user,
     bulk_follow_users,
     bulk_unfollow_users,
+    get_followers_with_counts,
+    get_users_info,
+    get_random_users_with_more_following,  # Updated function
 )
 from data_manager import (
     load_previous_followers,
@@ -67,9 +69,9 @@ def get_data():
     # Fetch data based on the requested type
     try:
         if data_type == 'followers':
-            current_followers = get_followers()
+            current_followers = get_followers_with_counts()
             # Apply ignore list
-            current_followers = [user for user in current_followers if user not in ignore_list]
+            current_followers = [user for user in current_followers if user['login'] not in ignore_list]
             data = {'followers': current_followers}
             return jsonify(data)
         elif data_type == 'following':
@@ -93,14 +95,16 @@ def get_data():
                 if datetime.fromisoformat(timestamp) >= current_time - timedelta(days=3)
             }
             save_new_followers(recent_new_followers)
-            data = {'new_followers': list(recent_new_followers.keys())}
+            new_followers_info = get_users_info(list(recent_new_followers.keys()))
+            data = {'new_followers': new_followers_info}
             return jsonify(data)
         elif data_type == 'unfollowers':
             current_followers = get_followers()
             unfollowers = list(set(previous_followers) - set(current_followers))
             # Apply ignore list
             unfollowers = [user for user in unfollowers if user not in ignore_list]
-            data = {'unfollowers': unfollowers}
+            unfollowers_info = get_users_info(unfollowers)
+            data = {'unfollowers': unfollowers_info}
             return jsonify(data)
         elif data_type == 'not_following_back':
             current_followers = get_followers()
@@ -111,15 +115,31 @@ def get_data():
                 for f in current_following
                 if f['login'] not in current_follower_logins and f['login'] not in ignore_list
             ]
-            data = {'not_following_back': not_following_back}
+            not_following_back_info = get_users_info(not_following_back)
+            data = {'not_following_back': not_following_back_info}
             return jsonify(data)
         elif data_type == 'suggested_users':
-            current_followers = get_followers()
-            current_following = get_following()
-            suggested_users = get_suggested_users(current_following, current_followers)
+            # Fetch random users who have more following than followers
+            random_users = get_random_users_with_more_following()
             # Apply ignore list
-            suggested_users = [user for user in suggested_users if user not in ignore_list]
-            data = {'suggested_users': suggested_users}
+            random_users = [user for user in random_users if user['login'] not in ignore_list]
+            data = {'suggested_users': random_users}
+            return jsonify(data)
+        elif data_type == 'users_more_following':
+            followers_with_counts = get_followers_with_counts()
+            users_more_following = [
+                {
+                    'login': follower['login'],
+                    'followers': follower['followers'],
+                    'following': follower['following'],
+                    'difference': follower['following'] - follower['followers']
+                }
+                for follower in followers_with_counts
+                if follower['following'] > follower['followers'] and follower['login'] not in ignore_list
+            ]
+            # Sort users by the biggest difference
+            users_more_following.sort(key=lambda x: x['difference'], reverse=True)
+            data = {'users_more_following': users_more_following}
             return jsonify(data)
         else:
             logger.error(f'Invalid data type requested: {data_type}')
@@ -127,28 +147,6 @@ def get_data():
     except Exception as e:
         logger.exception(f"Error fetching data for {data_type}: {e}")
         return jsonify({'error': 'An error occurred while fetching data'}), 500
-
-@app.route('/follow/<username>', methods=['POST'])
-def follow(username):
-    logger.info(f'Attempting to follow {username}')
-    success, message = follow_user(username)
-    if success:
-        logger.info(f'Successfully followed {username}')
-        return jsonify({'success': True})
-    else:
-        logger.error(f'Failed to follow {username}: {message}')
-        return jsonify({'success': False, 'message': message}), 400
-
-@app.route('/unfollow/<username>', methods=['POST'])
-def unfollow(username):
-    logger.info(f'Attempting to unfollow {username}')
-    success, message = unfollow_user(username)
-    if success:
-        logger.info(f'Successfully unfollowed {username}')
-        return jsonify({'success': True})
-    else:
-        logger.error(f'Failed to unfollow {username}: {message}')
-        return jsonify({'success': False, 'message': message}), 400
 
 @app.route('/bulk_follow', methods=['POST'])
 def bulk_follow():

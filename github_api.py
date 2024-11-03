@@ -1,9 +1,10 @@
 import requests
 import json
-import threading
 import logging
+import time
+import random
 from decouple import config
-from utils import chunks, load_cache, save_cache
+from utils import chunks
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,9 @@ def execute_github_graphql_query(query, variables=None):
     try:
         logger.debug(f"Executing GraphQL query: {query.strip()} with variables: {variables}")
         response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 403:
+            logger.error('403 Forbidden: Check your token permissions and rate limits.')
+            raise Exception('403 Forbidden: Check your token permissions and rate limits.')
         response.raise_for_status()
         result = response.json()
         if 'errors' in result:
@@ -40,6 +44,8 @@ def get_rate_limit_status():
     query = '''
     {
       rateLimit {
+        limit
+        cost
         remaining
         resetAt
       }
@@ -54,110 +60,146 @@ def check_rate_limit():
     rate_limit = get_rate_limit_status()
     remaining = rate_limit['remaining']
     reset_at = rate_limit['resetAt']
+    logger.info(f'Rate limit: {remaining} remaining, resets at {reset_at}')
     if remaining < 100:
         logger.warning(f'Approaching rate limit: {remaining} requests remaining until {reset_at}')
         return False
-    logger.debug(f'Rate limit OK: {remaining} requests remaining')
     return True
 
-def get_followers():
-    logger.info("Fetching followers")
-    followers = []
-    cursor = None
-    while True:
-        query = '''
-        query ($cursor: String) {
-          viewer {
-            followers(first: 100, after: $cursor) {
-              nodes {
-                login
-              }
-              pageInfo {
-                hasNextPage
-                endCursor
-              }
-            }
-          }
-        }
-        '''
-        variables = {'cursor': cursor}
-        result = execute_github_graphql_query(query, variables)
-        viewer = result['data']['viewer']
-        batch_followers = [node['login'] for node in viewer['followers']['nodes']]
-        followers.extend(batch_followers)
-        logger.debug(f"Fetched {len(batch_followers)} followers in this batch")
-        if viewer['followers']['pageInfo']['hasNextPage']:
-            cursor = viewer['followers']['pageInfo']['endCursor']
-        else:
-            break
-    logger.info(f"Total followers fetched: {len(followers)}")
-    return followers
-
-def get_following():
-    logger.info("Fetching following")
-    following = []
-    cursor = None
-    while True:
-        query = '''
-        query ($cursor: String) {
-          viewer {
-            following(first: 100, after: $cursor) {
-              nodes {
-                login
-                __typename
-                id
-              }
-              pageInfo {
-                hasNextPage
-                endCursor
-              }
-            }
-          }
-        }
-        '''
-        variables = {'cursor': cursor}
-        result = execute_github_graphql_query(query, variables)
-        viewer = result['data']['viewer']
-        batch_following = [
-            {
-                'login': node['login'],
-                'type': node['__typename'],
-                'id': node['id']
-            }
-            for node in viewer['following']['nodes']
-        ]
-        following.extend(batch_following)
-        logger.debug(f"Fetched {len(batch_following)} following in this batch")
-        if viewer['following']['pageInfo']['hasNextPage']:
-            cursor = viewer['following']['pageInfo']['endCursor']
-        else:
-            break
-    logger.info(f"Total following fetched: {len(following)}")
-    return following
-
-def get_repository_owner_id(username):
-    logger.debug(f"Fetching repository owner ID for {username}")
-    query = '''
-    query ($username: String!) {
-      repositoryOwner(login: $username) {
-        id
-        __typename
-      }
-    }
-    '''
-    variables = {'username': username}
+def get_random_users_with_more_following():
+    logger.info("Fetching random users with more following than followers")
+    accumulated_users = []
+    per_page = 100  # Maximum allowed by the API
+    since = 0  # Starting user ID
     try:
-        result = execute_github_graphql_query(query, variables)
-        owner = result['data']['repositoryOwner']
-        if owner:
-            logger.debug(f"Found repository owner ID for {username}: {owner['id']}")
-            return owner['id'], owner['__typename']
-        else:
-            logger.warning(f"Repository owner not found for {username}")
-            return None, None
+        while len(accumulated_users) < 2000:  # Fetch until we have enough users
+            response = requests.get(
+                f'https://api.github.com/users?per_page={per_page}&since={since}',
+                headers=headers
+            )
+            if response.status_code == 403:
+                logger.error('403 Forbidden: Check your token permissions and rate limits.')
+                raise Exception('403 Forbidden: Check your token permissions and rate limits.')
+            response.raise_for_status()
+            users = response.json()
+            if not users:
+                break  # No more users to fetch
+            accumulated_users.extend(users)
+            since = users[-1]['id']  # Update 'since' to the last user's ID
+            if len(accumulated_users) >= 1000:
+                break
+            time.sleep(1)  # Sleep to respect rate limits
+        # Fetch detailed info
+        usernames = [user['login'] for user in accumulated_users]
+        users_info = get_users_info_with_more_following(usernames)
+        logger.info(f"Users with more following fetched: {len(users_info)} users")
+        # Select random 25 users
+        random_users = random.sample(users_info, min(25, len(users_info)))
+        return random_users
     except Exception as e:
-        logger.error(f'Error fetching repository owner ID for {username}: {e}')
-        return None, None
+        logger.error(f'Error fetching random users with more following: {e}')
+        return []
+
+def get_users_info_with_more_following(usernames):
+    logger.info(f"Fetching info for users: {usernames}")
+    users_info = []
+    for chunk in chunks(usernames, 10):  # Reduced chunk size to 5
+        try:
+            query_fragments = []
+            for index, username in enumerate(chunk):
+                query_fragments.append(f'''
+                    user_{index}: user(login: "{username}") {{
+                        login
+                        followers {{
+                            totalCount
+                        }}
+                        following {{
+                            totalCount
+                        }}
+                        bio
+                        repositories(privacy: PUBLIC) {{
+                            totalCount
+                        }}
+                    }}
+                ''')
+            query = f'''
+            query {{
+                {"".join(query_fragments)}
+            }}
+            '''
+            result = execute_github_graphql_query(query)
+            data = result.get('data', {})
+            for key in data:
+                user_data = data[key]
+                if user_data:
+                    followers_count = user_data['followers']['totalCount']
+                    following_count = user_data['following']['totalCount']
+                    if following_count > followers_count:
+                        users_info.append({
+                            'login': user_data['login'],
+                            'followers': followers_count,
+                            'following': following_count,
+                            'bio': user_data.get('bio', ''),
+                            'public_repos': user_data['repositories']['totalCount'],
+                        })
+            time.sleep(1)
+        except Exception as e:
+            logger.error(f'Error fetching user info: {e}')
+            if 'rate limit' in str(e).lower():
+                logger.info('Waiting for rate limit reset...')
+                time.sleep(60)  # Wait 60 seconds before retrying
+            else:
+                continue
+    return users_info
+
+def get_users_info(usernames):
+    logger.info(f"Fetching info for users: {usernames}")
+    users_info = []
+    for chunk in chunks(usernames, 5):  # Reduced chunk size to 5
+        try:
+            query_fragments = []
+            for index, username in enumerate(chunk):
+                query_fragments.append(f'''
+                    user_{index}: user(login: "{username}") {{
+                        login
+                        followers {{
+                            totalCount
+                        }}
+                        following {{
+                            totalCount
+                        }}
+                        bio
+                        repositories(privacy: PUBLIC) {{
+                            totalCount
+                        }}
+                    }}
+                ''')
+            query = f'''
+            query {{
+                {"".join(query_fragments)}
+            }}
+            '''
+            result = execute_github_graphql_query(query)
+            data = result.get('data', {})
+            for key in data:
+                user_data = data[key]
+                if user_data:
+                    users_info.append({
+                        'login': user_data['login'],
+                        'followers': user_data['followers']['totalCount'],
+                        'following': user_data['following']['totalCount'],
+                        'bio': user_data.get('bio', ''),
+                        'public_repos': user_data['repositories']['totalCount'],
+                    })
+            time.sleep(1)
+        except Exception as e:
+            logger.error(f'Error fetching user info: {e}')
+            if 'rate limit' in str(e).lower():
+                logger.info('Waiting for rate limit reset...')
+                time.sleep(60)  # Wait 60 seconds before retrying
+            else:
+                continue
+    return users_info
 
 def follow_user(username):
     logger.debug(f"Attempting to follow {username}")
@@ -243,6 +285,7 @@ def bulk_follow_users(usernames):
     for username in usernames:
         success, message = follow_user(username)
         results[username] = {'success': success, 'message': message}
+        time.sleep(1)  # Delay to prevent hitting rate limits
     return results
 
 def bulk_unfollow_users(usernames):
@@ -251,87 +294,173 @@ def bulk_unfollow_users(usernames):
     for username in usernames:
         success, message = unfollow_user(username)
         results[username] = {'success': success, 'message': message}
+        time.sleep(1)  # Delay to prevent hitting rate limits
     return results
 
-def get_multiple_users_following(user_logins):
-    logger.info(f"Fetching following lists for multiple users")
-    suggested_users = set()
-    cache = load_cache()
-    lock = threading.Lock()
-    threads = []
+def get_repository_owner_id(username):
+    logger.debug(f"Fetching repository owner ID for {username}")
+    query = '''
+    query ($username: String!) {
+      repositoryOwner(login: $username) {
+        id
+        __typename
+      }
+    }
+    '''
+    variables = {'username': username}
+    try:
+        result = execute_github_graphql_query(query, variables)
+        owner = result['data']['repositoryOwner']
+        if owner:
+            logger.debug(f"Found repository owner ID for {username}: {owner['id']}")
+            return owner['id'], owner['__typename']
+        else:
+            logger.warning(f"Repository owner not found for {username}")
+            return None, None
+    except Exception as e:
+        logger.error(f'Error fetching repository owner ID for {username}: {e}')
+        return None, None
 
-    def fetch_following(chunk):
-        nonlocal suggested_users
-        if not check_rate_limit():
-            logger.warning("Rate limit reached, stopping fetch")
-            return
-        query_fragments = []
-        for index, login in enumerate(chunk):
-            query_fragments.append(f'''
-                user_{index}: repositoryOwner(login: "{login}") {{
-                    __typename
-                    ... on User {{
-                        login
-                        following(first: 100) {{
-                            nodes {{
-                                login
-                            }}
-                        }}
-                    }}
-                }}
-            ''')
-        query = f'''
-        query {{
-            {"".join(query_fragments)}
-        }}
-        '''
+def get_followers_with_counts():
+    logger.info("Fetching followers with counts")
+    followers = []
+    cursor = None
+    while True:
         try:
-            result = execute_github_graphql_query(query)
-            data = result.get('data', {})
-            for key in data:
-                user_data = data[key]
-                if user_data and user_data['__typename'] == 'User':
-                    following_nodes = user_data['following']['nodes']
-                    user_login = user_data.get('login')
-                    if user_login:
-                        with lock:
-                            cache[user_login] = [node['login'] for node in following_nodes]
-                            suggested_users.update(cache[user_login])
-                            logger.debug(f"Fetched following for {user_login}: {len(following_nodes)} users")
-                else:
-                    logger.warning(f"User data not found or not a User type for key: {key}")
+            query = '''
+            query ($cursor: String) {
+              viewer {
+                followers(first: 100, after: $cursor) {
+                  nodes {
+                    login
+                    followers {
+                      totalCount
+                    }
+                    following {
+                      totalCount
+                    }
+                  }
+                  pageInfo {
+                    hasNextPage
+                    endCursor
+                  }
+                }
+              }
+            }
+            '''
+            variables = {'cursor': cursor}
+            result = execute_github_graphql_query(query, variables)
+            viewer = result['data']['viewer']
+            batch_followers = [
+                {
+                    'login': node['login'],
+                    'followers': node['followers']['totalCount'],
+                    'following': node['following']['totalCount']
+                }
+                for node in viewer['followers']['nodes']
+            ]
+            followers.extend(batch_followers)
+            logger.debug(f"Fetched {len(batch_followers)} followers in this batch")
+            if viewer['followers']['pageInfo']['hasNextPage']:
+                cursor = viewer['followers']['pageInfo']['endCursor']
+                time.sleep(1)  # Delay to prevent hitting rate limits
+            else:
+                break
         except Exception as e:
-            logger.error(f'Error fetching data for users {chunk}: {e}')
+            logger.error(f'Error fetching followers with counts: {e}')
+            break
+    logger.info(f"Total followers fetched: {len(followers)}")
+    return followers
 
-    # Split user logins into chunks and create threads
-    for chunk in chunks(user_logins, 5):  # Adjust chunk size as needed
-        thread = threading.Thread(target=fetch_following, args=(chunk,))
-        threads.append(thread)
-        thread.start()
+def get_followers():
+    logger.info("Fetching followers")
+    followers = []
+    cursor = None
+    while True:
+        try:
+            query = '''
+            query ($cursor: String) {
+              viewer {
+                followers(first: 100, after: $cursor) {
+                  nodes {
+                    login
+                  }
+                  pageInfo {
+                    hasNextPage
+                    endCursor
+                  }
+                }
+              }
+            }
+            '''
+            variables = {'cursor': cursor}
+            result = execute_github_graphql_query(query, variables)
+            viewer = result['data']['viewer']
+            batch_followers = [node['login'] for node in viewer['followers']['nodes']]
+            followers.extend(batch_followers)
+            logger.debug(f"Fetched {len(batch_followers)} followers in this batch")
+            if viewer['followers']['pageInfo']['hasNextPage']:
+                cursor = viewer['followers']['pageInfo']['endCursor']
+                time.sleep(1)
+            else:
+                break
+        except Exception as e:
+            logger.error(f'Error fetching followers: {e}')
+            break
+    logger.info(f"Total followers fetched: {len(followers)}")
+    return followers
 
-    # Wait for all threads to complete
-    for thread in threads:
-        thread.join()
-
-    save_cache(cache)
-    logger.info(f"Total suggested users fetched: {len(suggested_users)}")
-    return suggested_users
-
-def get_suggested_users(current_following, current_followers):
-    logger.info("Calculating suggested users")
-    user_logins = [f['login'] for f in current_following if f['type'] == 'User']
-    suggested_users = get_multiple_users_following(user_logins)
-
-    # Remove users you're already following or who are following you
-    current_following_logins = set([f['login'] for f in current_following])
-    suggested_users -= current_following_logins
-    suggested_users -= set(current_followers)
-    suggested_users.discard(GITHUB_USERNAME)
-
-    # Convert to list and limit to 25 users
-    suggested_users = list(suggested_users)
-    if len(suggested_users) > 25:
-        import random
-        suggested_users = random.sample(suggested_users, 25)
-    logger.info(f"Suggested users ready: {len(suggested_users)} users")
-    return suggested_users
+def get_following():
+    logger.info("Fetching following")
+    following = []
+    cursor = None
+    while True:
+        try:
+            query = '''
+            query ($cursor: String) {
+              viewer {
+                following(first: 100, after: $cursor) {
+                  nodes {
+                    login
+                    __typename
+                    id
+                    followers {
+                        totalCount
+                    }
+                    following {
+                        totalCount
+                    }
+                  }
+                  pageInfo {
+                    hasNextPage
+                    endCursor
+                  }
+                }
+              }
+            }
+            '''
+            variables = {'cursor': cursor}
+            result = execute_github_graphql_query(query, variables)
+            viewer = result['data']['viewer']
+            batch_following = [
+                {
+                    'login': node['login'],
+                    'type': node['__typename'],
+                    'id': node['id'],
+                    'followers': node['followers']['totalCount'],
+                    'following': node['following']['totalCount']
+                }
+                for node in viewer['following']['nodes']
+            ]
+            following.extend(batch_following)
+            logger.debug(f"Fetched {len(batch_following)} following in this batch")
+            if viewer['following']['pageInfo']['hasNextPage']:
+                cursor = viewer['following']['pageInfo']['endCursor']
+                time.sleep(1)
+            else:
+                break
+        except Exception as e:
+            logger.error(f'Error fetching following: {e}')
+            break
+    logger.info(f"Total following fetched: {len(following)}")
+    return following

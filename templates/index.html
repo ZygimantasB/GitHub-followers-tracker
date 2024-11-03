@@ -14,6 +14,7 @@
   <h2 onclick="toggleVisibility('followers-list')">
     Followers (<span id="followers-count">0</span>)
     <button class="load-data-button" data-type="followers">Load Data</button>
+    <button id="unfollow-all-followers-button">Unfollow All</button>
   </h2>
   <ul id="followers-list" class="collapsible-list">
     <!-- Followers will be populated here -->
@@ -23,6 +24,7 @@
   <h2 onclick="toggleVisibility('following-list')">
     Following (<span id="following-count">0</span>)
     <button class="load-data-button" data-type="following">Load Data</button>
+    <button id="unfollow-all-following-button">Unfollow All</button>
   </h2>
   <ul id="following-list" class="collapsible-list">
     <!-- Following will be populated here -->
@@ -32,6 +34,7 @@
   <h2 onclick="toggleVisibility('new-followers-list')">
     New Followers (<span id="new-followers-count">0</span>)
     <button class="load-data-button" data-type="new_followers">Load Data</button>
+    <button id="follow-all-new-followers-button">Follow All</button>
   </h2>
   <ul id="new-followers-list" class="collapsible-list">
     <!-- New followers will be populated here -->
@@ -61,10 +64,20 @@
   <h2 onclick="toggleVisibility('suggested-users-list')">
     Suggested Users (<span id="suggested-users-count">0</span>)
     <button class="load-data-button" data-type="suggested_users">Load Data</button>
-    <button id="follow-all-suggested-users-button">Follow All</button>
+    <button id="follow-selected-suggested-users-button">Follow Selected</button>
   </h2>
   <ul id="suggested-users-list" class="collapsible-list">
     <!-- Suggested users will be populated here -->
+  </ul>
+
+  <!-- Users Following More Than Followed -->
+  <h2 onclick="toggleVisibility('users-more-following-list')">
+    Users Following More Than Followed (<span id="users-more-following-count">0</span>)
+    <button class="load-data-button" data-type="users_more_following">Load Data</button>
+    <!-- No "Unfollow All" button here -->
+  </h2>
+  <ul id="users-more-following-list" class="collapsible-list">
+    <!-- Users will be populated here -->
   </ul>
 
 </div>
