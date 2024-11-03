@@ -41,6 +41,32 @@ document.addEventListener('DOMContentLoaded', function() {
         followSelectedUsers();
     });
 
+    // Handle Search Form Submission
+    const searchForm = document.getElementById('search-form');
+    searchForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const username = document.getElementById('search-username').value.trim();
+        if (username) {
+            searchUser(username);
+        }
+    });
+
+    async function searchUser(username) {
+        try {
+            const response = await fetch(`/check_follow?username=${encodeURIComponent(username)}`);
+            const data = await response.json();
+            const searchResultDiv = document.getElementById('search-result');
+            if (data.error) {
+                searchResultDiv.textContent = `Error: ${data.error}`;
+            } else {
+                const followsYouText = data.follows_you ? 'follows you' : 'does not follow you';
+                searchResultDiv.textContent = `${username} ${followsYouText}.`;
+            }
+        } catch (error) {
+            console.error('Error searching user:', error);
+        }
+    }
+
     async function fetchData(dataType) {
         try {
             const response = await fetch(`/get_data?type=${dataType}`);

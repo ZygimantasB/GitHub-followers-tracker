@@ -464,3 +464,26 @@ def get_following():
             break
     logger.info(f"Total following fetched: {len(following)}")
     return following
+
+def check_if_user_follows_viewer(username):
+    logger.debug(f"Checking if user {username} follows the viewer")
+    query = '''
+    query ($username: String!) {
+      user(login: $username) {
+        isFollowingViewer
+      }
+    }
+    '''
+    variables = {'username': username}
+    try:
+        result = execute_github_graphql_query(query, variables)
+        user_data = result['data']['user']
+        if user_data is None:
+            logger.error(f"User {username} not found")
+            raise Exception('User not found')
+        follows_viewer = user_data['isFollowingViewer']
+        logger.debug(f"User {username} follows viewer: {follows_viewer}")
+        return follows_viewer
+    except Exception as e:
+        logger.error(f'Error checking if user {username} follows viewer: {e}')
+        raise

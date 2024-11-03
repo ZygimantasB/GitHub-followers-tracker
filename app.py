@@ -12,6 +12,7 @@ from github_api import (
     get_followers_with_counts,
     get_users_info,
     get_random_users_with_more_following,
+    check_if_user_follows_viewer,  # Import the new function
 )
 from data_manager import (
     load_previous_followers,
@@ -162,7 +163,6 @@ def bulk_unfollow():
     results = bulk_unfollow_users(usernames)
     return jsonify(results)
 
-# Add these routes for individual follow/unfollow actions
 @app.route('/unfollow/<username>', methods=['POST'])
 def unfollow(username):
     logger.info(f'Attempting to unfollow user: {username}')
@@ -180,6 +180,20 @@ def follow(username):
         return jsonify({'success': True})
     else:
         return jsonify({'success': False, 'message': message}), 500
+
+# Add this route for the search functionality
+@app.route('/check_follow')
+def check_follow():
+    username = request.args.get('username')
+    if not username:
+        return jsonify({'error': 'Username parameter is required'}), 400
+    logger.info(f'Checking if user {username} follows the viewer')
+    try:
+        follows_you = check_if_user_follows_viewer(username)
+        return jsonify({'username': username, 'follows_you': follows_you})
+    except Exception as e:
+        logger.exception(f"Error checking if user {username} follows viewer: {e}")
+        return jsonify({'error': 'An error occurred while checking the user'}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

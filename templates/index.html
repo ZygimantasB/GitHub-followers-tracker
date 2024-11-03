@@ -10,6 +10,16 @@
 <div class="container">
   <h1>GitHub Follower Tracker</h1>
 
+  <!-- Search Box -->
+  <div id="search-section">
+    <h2>Search User</h2>
+    <form id="search-form">
+      <input type="text" id="search-username" placeholder="Enter GitHub username" required>
+      <button type="submit">Search</button>
+    </form>
+    <div id="search-result"></div>
+  </div>
+
   <!-- Followers -->
   <h2 onclick="toggleVisibility('followers-list')">
     Followers (<span id="followers-count">0</span>)

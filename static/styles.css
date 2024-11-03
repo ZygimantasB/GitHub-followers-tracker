@@ -28,7 +28,7 @@ h2 {
     font-size: 1.8rem;
     border-bottom: 2px solid #00b0ff;
     padding-bottom: 5px;
-    margin-top: 30px;
+    margin-top: 40px;
     cursor: pointer;
 }
 
@@ -176,4 +176,51 @@ h2 button:hover {
     font-size: 0.9em;
     color: #bbb;
     margin-left: 5px;
+}
+
+/* Search Section Styling */
+#search-section {
+    background-color: #2c2c2c;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+}
+
+#search-form {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+#search-form input[type="text"] {
+    width: 60%;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    font-size: 1em;
+    margin-right: 10px;
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+}
+
+#search-form button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    background-color: #00e676;
+    color: #121212;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#search-form button:hover {
+    background-color: #00c853;
+}
+
+#search-result {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 1.2em;
 }
