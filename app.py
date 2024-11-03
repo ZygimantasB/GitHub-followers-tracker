@@ -11,7 +11,7 @@ from github_api import (
     bulk_unfollow_users,
     get_followers_with_counts,
     get_users_info,
-    get_random_users_with_more_following,  # Updated function
+    get_random_users_with_more_following,
 )
 from data_manager import (
     load_previous_followers,
@@ -161,6 +161,25 @@ def bulk_unfollow():
     logger.info(f'Attempting to bulk unfollow users: {usernames}')
     results = bulk_unfollow_users(usernames)
     return jsonify(results)
+
+# Add these routes for individual follow/unfollow actions
+@app.route('/unfollow/<username>', methods=['POST'])
+def unfollow(username):
+    logger.info(f'Attempting to unfollow user: {username}')
+    success, message = unfollow_user(username)
+    if success:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'message': message}), 500
+
+@app.route('/follow/<username>', methods=['POST'])
+def follow(username):
+    logger.info(f'Attempting to follow user: {username}')
+    success, message = follow_user(username)
+    if success:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'message': message}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -86,7 +86,7 @@ def get_random_users_with_more_following():
                 break  # No more users to fetch
             accumulated_users.extend(users)
             since = users[-1]['id']  # Update 'since' to the last user's ID
-            if len(accumulated_users) >= 1000:
+            if len(accumulated_users) >= 2000:
                 break
             time.sleep(1)  # Sleep to respect rate limits
         # Fetch detailed info
@@ -103,7 +103,7 @@ def get_random_users_with_more_following():
 def get_users_info_with_more_following(usernames):
     logger.info(f"Fetching info for users: {usernames}")
     users_info = []
-    for chunk in chunks(usernames, 10):  # Reduced chunk size to 5
+    for chunk in chunks(usernames, 10):  # Increased chunk size to 10
         try:
             query_fragments = []
             for index, username in enumerate(chunk):
@@ -155,7 +155,7 @@ def get_users_info_with_more_following(usernames):
 def get_users_info(usernames):
     logger.info(f"Fetching info for users: {usernames}")
     users_info = []
-    for chunk in chunks(usernames, 5):  # Reduced chunk size to 5
+    for chunk in chunks(usernames, 5):  # Chunk size of 5
         try:
             query_fragments = []
             for index, username in enumerate(chunk):
