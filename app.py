@@ -1,3 +1,5 @@
+# app.py
+
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import Flask, render_template, request, jsonify
@@ -12,7 +14,7 @@ from github_api import (
     get_followers_with_counts,
     get_users_info,
     get_random_users_with_more_following,
-    check_if_user_follows_viewer,  # Import the new function
+    check_if_user_follows_viewer,
 )
 from data_manager import (
     load_previous_followers,
@@ -22,6 +24,13 @@ from data_manager import (
     load_ignore_list,
 )
 from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+import random
+import atexit
+
+# Import the task functions from the separate files
+from daily_tasks import run_daily_tasks
+from weekly_tasks import run_weekly_tasks
 
 app = Flask(__name__)
 
@@ -49,6 +58,21 @@ file_handler.setFormatter(formatter)
 if not logger.handlers:
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
+
+# Initialize the scheduler
+scheduler = BackgroundScheduler()
+
+# Schedule the daily task at 6 am every day
+scheduler.add_job(run_daily_tasks, 'cron', hour=6)
+
+# Schedule the weekly task at 1 am every Monday
+scheduler.add_job(run_weekly_tasks, 'cron', day_of_week='mon', hour=1)
+
+# Start the scheduler
+scheduler.start()
+
+# Ensure Flask shuts down gracefully
+atexit.register(lambda: scheduler.shutdown())
 
 @app.route('/')
 def index():
@@ -196,4 +220,4 @@ def check_follow():
         return jsonify({'error': 'An error occurred while checking the user'}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=9999)
