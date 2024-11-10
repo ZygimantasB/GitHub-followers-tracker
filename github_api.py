@@ -67,7 +67,7 @@ def check_rate_limit():
     return True
 
 def get_random_users_with_more_following():
-    logger.info("Fetching random users with more following than followers and at least 50 following")
+    logger.info("Fetching random users with more following than followers and at least 75 following")
     accumulated_users = []
     per_page = 100  # Maximum allowed by the API
     since = 0  # Starting user ID
@@ -137,7 +137,7 @@ def get_users_info_with_more_following(usernames):
                 if user_data and user_data['__typename'] == 'User':
                     followers_count = user_data['followers']['totalCount']
                     following_count = user_data['following']['totalCount']
-                    if (following_count - followers_count >= 25) and following_count >= 50:
+                    if (following_count - followers_count >= 25) and following_count >= 75:
                         users_info.append({
                             'login': user_data['login'],
                             'followers': followers_count,

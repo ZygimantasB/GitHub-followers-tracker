@@ -1,3 +1,5 @@
+// script.js
+
 function toggleVisibility(id) {
     const element = document.getElementById(id);
     if (element.style.maxHeight) {
@@ -39,6 +41,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('follow-selected-suggested-users-button').addEventListener('click', function() {
         followSelectedUsers();
+    });
+
+    // Add this event listener for the "Follow All" button
+    document.getElementById('follow-all-suggested-users-button').addEventListener('click', function() {
+        followAllSuggestedUsers();
     });
 
     // Handle Search Form Submission
@@ -147,6 +154,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Add this function for the "Follow All" action
+    async function followAllSuggestedUsers() {
+        const list = document.getElementById('suggested-users-list');
+        const usernames = Array.from(list.querySelectorAll('.list-item')).map(li => li.dataset.username);
+        if (usernames.length > 0) {
+            try {
+                showLoadingIndicator();
+                const response = await fetch('/bulk_follow', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ usernames: usernames })
+                });
+                const results = await response.json();
+                usernames.forEach(username => {
+                    if (results[username] && results[username].success) {
+                        const li = list.querySelector(`.list-item[data-username="${username}"]`);
+                        if (li) {
+                            li.style.display = 'none';
+                        }
+                    } else {
+                        console.error(`Failed to follow ${username}: ${results[username].message}`);
+                    }
+                });
+            } catch (error) {
+                console.error('Error during following all suggested users:', error);
+            } finally {
+                hideLoadingIndicator();
+            }
+        } else {
+            alert('No users available to follow.');
+        }
+    }
+
     function populateData(dataType, data) {
         const counts = {
             'followers': 'followers-count',
@@ -183,7 +225,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const dataList = data[dataKeys[dataType]];
 
         // Update counts
-        countElement.textContent = dataList.length;
+        if (countElement) {
+            countElement.textContent = dataList.length;
+        }
         // Clear existing list
         listElement.innerHTML = '';
 
