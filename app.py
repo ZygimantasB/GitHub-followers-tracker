@@ -1,5 +1,3 @@
-# app.py
-
 import logging
 from logging.handlers import RotatingFileHandler
 from flask import Flask, render_template, request, jsonify
@@ -30,7 +28,7 @@ import atexit
 
 # Import the task functions from the separate files
 from daily_tasks import run_daily_tasks
-from weekly_tasks import run_weekly_tasks
+from monthly_tasks import run_monthly_tasks  # Updated import
 
 app = Flask(__name__)
 
@@ -65,8 +63,8 @@ scheduler = BackgroundScheduler()
 # Schedule the daily task at 6 am every day
 scheduler.add_job(run_daily_tasks, 'cron', hour=6)
 
-# Schedule the weekly task at 1 am every Monday
-scheduler.add_job(run_weekly_tasks, 'cron', day_of_week='mon', hour=1)
+# Schedule the monthly task at 1 am on the first day of each month
+scheduler.add_job(run_monthly_tasks, 'cron', day=1, hour=1)
 
 # Start the scheduler
 scheduler.start()
@@ -160,7 +158,7 @@ def get_data():
                     'difference': follower['following'] - follower['followers']
                 }
                 for follower in followers_with_counts
-                if follower['following'] > follower['followers'] and follower['login'] not in ignore_list
+                if (follower['following'] - follower['followers'] >= 25) and follower['login'] not in ignore_list
             ]
             # Sort users by the biggest difference
             users_more_following.sort(key=lambda x: x['difference'], reverse=True)

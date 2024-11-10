@@ -5,10 +5,10 @@ from github_api import (
     bulk_unfollow_users,
 )
 
-logger = logging.getLogger('weekly_tasks')
+logger = logging.getLogger('monthly_tasks')
 
-def run_weekly_tasks():
-    logger.info("Starting weekly tasks")
+def run_monthly_tasks():
+    logger.info("Starting monthly tasks")
 
     # Unfollow users who are not following back
     logger.info("Removing users who are not following back")
@@ -24,4 +24,4 @@ def run_weekly_tasks():
     else:
         logger.info("No users to unfollow")
 
-    logger.info("Weekly tasks completed")
+    logger.info("Monthly tasks completed")

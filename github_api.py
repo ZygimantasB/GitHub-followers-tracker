@@ -67,7 +67,7 @@ def check_rate_limit():
     return True
 
 def get_random_users_with_more_following():
-    logger.info("Fetching random users with more following than followers and at least 75 following")
+    logger.info("Fetching random users with more following than followers and at least 50 following")
     accumulated_users = []
     per_page = 100  # Maximum allowed by the API
     since = 0  # Starting user ID
@@ -93,8 +93,10 @@ def get_random_users_with_more_following():
         usernames = [user['login'] for user in accumulated_users]
         users_info = get_users_info_with_more_following(usernames)
         logger.info(f"Users with more following fetched: {len(users_info)} users")
-        # Select random 25 users
-        random_users = random.sample(users_info, min(25, len(users_info)))
+        # Filter out organizations
+        users_info = [user for user in users_info if user['__typename'] == 'User']
+        # Select random 50 users
+        random_users = random.sample(users_info, min(50, len(users_info)))
         return random_users
     except Exception as e:
         logger.error(f'Error fetching random users with more following: {e}')
@@ -110,6 +112,7 @@ def get_users_info_with_more_following(usernames):
                 query_fragments.append(f'''
                     user_{index}: user(login: "{username}") {{
                         login
+                        __typename
                         followers {{
                             totalCount
                         }}
@@ -131,16 +134,17 @@ def get_users_info_with_more_following(usernames):
             data = result.get('data', {})
             for key in data:
                 user_data = data[key]
-                if user_data:
+                if user_data and user_data['__typename'] == 'User':
                     followers_count = user_data['followers']['totalCount']
                     following_count = user_data['following']['totalCount']
-                    if following_count > followers_count and following_count >= 75:
+                    if (following_count - followers_count >= 25) and following_count >= 50:
                         users_info.append({
                             'login': user_data['login'],
                             'followers': followers_count,
                             'following': following_count,
                             'bio': user_data.get('bio', ''),
                             'public_repos': user_data['repositories']['totalCount'],
+                            '__typename': user_data['__typename'],
                         })
             time.sleep(1)
         except Exception as e:
@@ -208,6 +212,10 @@ def follow_user(username):
         logger.error(f"User not found: {username}")
         return False, 'User not found'
 
+    if owner_type != 'User':
+        logger.error(f"Cannot follow {username} because they are not a user")
+        return False, 'Cannot follow organizations automatically'
+
     mutation_user = '''
     mutation ($userId: ID!) {
       followUser(input: {userId: $userId}) {
@@ -215,22 +223,9 @@ def follow_user(username):
       }
     }
     '''
-    mutation_org = '''
-    mutation ($organizationId: ID!) {
-      followOrganization(input: {organizationId: $organizationId}) {
-        clientMutationId
-      }
-    }
-    '''
-    if owner_type == 'User':
-        mutation = mutation_user
-        variables = {'userId': owner_id}
-    elif owner_type == 'Organization':
-        mutation = mutation_org
-        variables = {'organizationId': owner_id}
-    else:
-        logger.error(f"Unsupported owner type for {username}: {owner_type}")
-        return False, 'Unsupported owner type'
+
+    mutation = mutation_user
+    variables = {'userId': owner_id}
 
     try:
         execute_github_graphql_query(mutation, variables)
