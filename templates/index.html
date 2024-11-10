@@ -4,97 +4,112 @@
   <meta charset="UTF-8">
   <title>GitHub Follower Tracker</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Include Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <div class="container">
-  <h1>GitHub Follower Tracker</h1>
+  <header>
+    <h1>GitHub Follower Tracker</h1>
+  </header>
 
   <!-- Search Box -->
-  <div id="search-section">
+  <section id="search-section">
     <h2>Search User</h2>
     <form id="search-form">
       <input type="text" id="search-username" placeholder="Enter GitHub username" required>
       <button type="submit">Search</button>
     </form>
     <div id="search-result"></div>
-  </div>
+  </section>
 
   <!-- Loading Indicator -->
   <div id="loading-indicator" class="loading-indicator" style="display: none;">
     Loading data, please wait...
   </div>
 
-  <!-- Followers -->
-  <h2 onclick="toggleVisibility('followers-list')">
-    Followers (<span id="followers-count">0</span>)
-    <button class="load-data-button" data-type="followers">Load Data</button>
-    <button id="unfollow-all-followers-button">Unfollow All</button>
-  </h2>
-  <ul id="followers-list" class="collapsible-list">
-    <!-- Followers will be populated here -->
-  </ul>
+  <!-- Data Sections -->
+  <section class="data-section" id="followers-section">
+    <h2>
+      Followers (<span id="followers-count">0</span>)
+      <div class="button-group">
+        <button class="load-data-button" data-type="followers">Load Data</button>
+        <button id="unfollow-all-followers-button">Unfollow All</button>
+      </div>
+    </h2>
+    <ul id="followers-list" class="collapsible-list"></ul>
+  </section>
 
-  <!-- Following -->
-  <h2 onclick="toggleVisibility('following-list')">
-    Following (<span id="following-count">0</span>)
-    <button class="load-data-button" data-type="following">Load Data</button>
-    <button id="unfollow-all-following-button">Unfollow All</button>
-  </h2>
-  <ul id="following-list" class="collapsible-list">
-    <!-- Following will be populated here -->
-  </ul>
+  <section class="data-section" id="following-section">
+    <h2>
+      Following (<span id="following-count">0</span>)
+      <div class="button-group">
+        <button class="load-data-button" data-type="following">Load Data</button>
+        <button id="unfollow-all-following-button">Unfollow All</button>
+      </div>
+    </h2>
+    <ul id="following-list" class="collapsible-list"></ul>
+  </section>
 
-  <!-- New Followers -->
-  <h2 onclick="toggleVisibility('new-followers-list')">
-    New Followers (<span id="new-followers-count">0</span>)
-    <button class="load-data-button" data-type="new_followers">Load Data</button>
-    <button id="follow-all-new-followers-button">Follow All</button>
-  </h2>
-  <ul id="new-followers-list" class="collapsible-list">
-    <!-- New followers will be populated here -->
-  </ul>
+  <section class="data-section" id="new-followers-section">
+    <h2>
+      New Followers (<span id="new-followers-count">0</span>)
+      <div class="button-group">
+        <button class="load-data-button" data-type="new_followers">Load Data</button>
+        <button id="follow-all-new-followers-button">Follow All</button>
+      </div>
+    </h2>
+    <ul id="new-followers-list" class="collapsible-list"></ul>
+  </section>
 
-  <!-- Unfollowers -->
-  <h2 onclick="toggleVisibility('unfollowers-list')">
-    Unfollowers (<span id="unfollowers-count">0</span>)
-    <button class="load-data-button" data-type="unfollowers">Load Data</button>
-    <button id="unfollow-all-unfollowers-button">Unfollow All</button>
-  </h2>
-  <ul id="unfollowers-list" class="collapsible-list">
-    <!-- Unfollowers will be populated here -->
-  </ul>
+  <section class="data-section" id="unfollowers-section">
+    <h2>
+      Unfollowers (<span id="unfollowers-count">0</span>)
+      <div class="button-group">
+        <button class="load-data-button" data-type="unfollowers">Load Data</button>
+        <button id="unfollow-all-unfollowers-button">Unfollow All</button>
+      </div>
+    </h2>
+    <ul id="unfollowers-list" class="collapsible-list"></ul>
+  </section>
 
-  <!-- Not Following Back -->
-  <h2 onclick="toggleVisibility('not-following-back-list')">
-    Not Following Back (<span id="not-following-back-count">0</span>)
-    <button class="load-data-button" data-type="not_following_back">Load Data</button>
-    <button id="unfollow-all-not-following-back-button">Unfollow All</button>
-  </h2>
-  <ul id="not-following-back-list" class="collapsible-list">
-    <!-- Not following back will be populated here -->
-  </ul>
+  <section class="data-section" id="not-following-back-section">
+    <h2>
+      Not Following Back (<span id="not-following-back-count">0</span>)
+      <div class="button-group">
+        <button class="load-data-button" data-type="not_following_back">Load Data</button>
+        <button id="unfollow-all-not-following-back-button">Unfollow All</button>
+      </div>
+    </h2>
+    <ul id="not-following-back-list" class="collapsible-list"></ul>
+  </section>
 
-  <!-- Suggested Users -->
-  <h2 onclick="toggleVisibility('suggested-users-list')">
-    Suggested Users (<span id="suggested-users-count">0</span>)
-    <button class="load-data-button" data-type="suggested_users">Load Data</button>
-    <button id="follow-selected-suggested-users-button">Follow Selected</button>
-    <button id="follow-all-suggested-users-button">Follow All</button>
-  </h2>
-  <ul id="suggested-users-list" class="collapsible-list">
-    <!-- Suggested users will be populated here -->
-  </ul>
+  <section class="data-section" id="suggested-users-section">
+    <h2>
+      Suggested Users (<span id="suggested-users-count">0</span>)
+      <div class="button-group">
+        <button class="load-data-button" data-type="suggested_users">Load Data</button>
+        <button id="follow-selected-suggested-users-button">Follow Selected</button>
+        <button id="follow-all-suggested-users-button">Follow All</button>
+      </div>
+    </h2>
+    <ul id="suggested-users-list" class="collapsible-list"></ul>
+  </section>
 
-  <!-- Users Following More Than Followed -->
-  <h2 onclick="toggleVisibility('users-more-following-list')">
-    Users Following More Than Followed (<span id="users-more-following-count">0</span>)
-    <button class="load-data-button" data-type="users_more_following">Load Data</button>
-    <!-- No "Unfollow All" button here -->
-  </h2>
-  <ul id="users-more-following-list" class="collapsible-list">
-    <!-- Users will be populated here -->
-  </ul>
+  <section class="data-section" id="users-more-following-section">
+    <h2>
+      Users Following More Than Followed (<span id="users-more-following-count">0</span>)
+      <div class="button-group">
+        <button class="load-data-button" data-type="users_more_following">Load Data</button>
+      </div>
+    </h2>
+    <ul id="users-more-following-list" class="collapsible-list"></ul>
+  </section>
+
+  <footer>
+    <p>&copy; 2024 GitHub Follower Tracker</p>
+  </footer>
 
 </div>
 
