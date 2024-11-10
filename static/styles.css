@@ -1,41 +1,61 @@
+/* styles.css */
+
+/* Global Styles */
 body {
     font-family: 'Roboto', sans-serif;
-    background-color: #121212;
-    color: #e0e0e0;
+    background-color: #0d0d0d;
+    color: #f0f0f0;
     margin: 0;
-    padding: 20px;
+    padding: 0;
     line-height: 1.6;
 }
 
 .container {
-    max-width: 800px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 20px;
-    background-color: #1e1e1e;
-    border-radius: 10px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    background-color: #1a1a1a;
 }
 
 h1 {
     text-align: center;
-    color: #00e676;
-    font-size: 2.5rem;
-    margin-bottom: 20px;
+    color: #ffffff;
+    font-size: 3rem;
+    margin-bottom: 40px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 h2 {
-    color: #00b0ff;
+    color: #ffffff;
     font-size: 1.8rem;
-    border-bottom: 2px solid #00b0ff;
-    padding-bottom: 5px;
     margin-top: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     cursor: pointer;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #333;
+}
+
+h2:hover {
+    color: #ff9800;
 }
 
 h2 button {
-    font-size: 0.8rem;
+    background: #333;
+    color: #ffffff;
+    border: none;
+    padding: 8px 12px;
     margin-left: 10px;
-    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    transition: background 0.3s ease;
+}
+
+h2 button:hover {
+    background: #444;
 }
 
 .collapsible-list {
@@ -47,11 +67,16 @@ h2 button {
     transition: max-height 0.4s ease-out;
 }
 
+.collapsible-list.open {
+    max-height: 1000px; /* Adjust as needed */
+    transition: max-height 0.5s ease-in;
+}
+
 li {
-    background: #333;
+    background: #262626;
     margin: 10px 0;
-    padding: 15px;
-    border-radius: 5px;
+    padding: 20px;
+    border-radius: 10px;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
@@ -59,26 +84,26 @@ li {
 }
 
 li:hover {
-    background: #444;
-    transform: translateX(5px);
+    background: #333333;
+    transform: scale(1.02);
 }
 
 .btn-refresh {
     display: block;
     width: 100%;
-    background: #00e676;
-    color: #121212;
-    padding: 10px;
+    background: #ff9800;
+    color: #ffffff;
+    padding: 12px;
     text-align: center;
     font-size: 1.2rem;
     border-radius: 5px;
     text-decoration: none;
-    margin-top: 20px;
+    margin-top: 30px;
     transition: background 0.3s ease;
 }
 
 .btn-refresh:hover {
-    background: #00c853;
+    background: #e68900;
 }
 
 @media (max-width: 600px) {
@@ -87,11 +112,20 @@ li:hover {
     }
 
     h2 {
-        font-size: 1.5rem;
+        font-size: 1.4rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    h2 button {
+        margin-top: 10px;
+        margin-left: 0;
     }
 
     li {
-        padding: 10px;
+        padding: 15px;
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .btn-refresh {
@@ -99,28 +133,34 @@ li:hover {
     }
 }
 
-/* Button Unfollow */
+/* Button Styles */
 
 .btn-unfollow {
-    background-color: #ff5252;
+    background-color: #e53935;
     color: #ffffff;
     border: none;
-    padding: 8px 12px;
+    padding: 10px 15px;
     cursor: pointer;
     border-radius: 5px;
     transition: background-color 0.3s ease;
 }
 
 .btn-unfollow:hover {
-    background-color: #ff1744;
+    background-color: #d32f2f;
 }
 
-/* Button Follow */
+.btn-follow {
+    background-color: #43a047;
+    color: #ffffff;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
 
-.list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.btn-follow:hover {
+    background-color: #388e3c;
 }
 
 .button-group {
@@ -128,32 +168,10 @@ li:hover {
     gap: 10px; /* Space between buttons */
 }
 
-.btn-follow {
-    background-color: #00b0ff;
-    color: #ffffff;
-    border: none;
-    padding: 8px 12px;
-    cursor: pointer;
-    border-radius: 5px;
-    transition: background-color 0.3s ease;
-}
-
-.btn-follow:hover {
-    background-color: #0091ea;
-}
-
-h2 button {
-    background: #555;
-    color: #fff;
-    border: none;
-    padding: 5px 10px;
-    margin-left: 5px;
-    cursor: pointer;
-    border-radius: 5px;
-}
-
-h2 button:hover {
-    background: #666;
+.list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 /* User Info Styling */
@@ -164,63 +182,72 @@ h2 button:hover {
 
 .user-info .username {
     font-weight: bold;
-    font-size: 1.1em;
+    font-size: 1.2em;
+}
+
+.user-info .counts {
+    font-size: 0.9em;
+    color: #cccccc;
+    margin-top: 5px;
 }
 
 /* Checkbox styling */
 .list-item input[type="checkbox"] {
-    margin-right: 10px;
-}
-
-.counts {
-    font-size: 0.9em;
-    color: #bbb;
-    margin-left: 5px;
+    margin-right: 15px;
+    accent-color: #ff9800;
 }
 
 /* Search Section Styling */
 #search-section {
-    background-color: #2c2c2c;
-    padding: 20px;
+    background-color: #1a1a1a;
+    padding: 30px;
     border-radius: 10px;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
+}
+
+#search-section h2 {
+    margin-top: 0;
 }
 
 #search-form {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: 20px;
 }
 
 #search-form input[type="text"] {
-    width: 60%;
-    padding: 10px;
+    width: 70%;
+    padding: 12px;
     border: none;
     border-radius: 5px;
     font-size: 1em;
     margin-right: 10px;
-    background-color: #1e1e1e;
-    color: #e0e0e0;
+    background-color: #262626;
+    color: #f0f0f0;
+}
+
+#search-form input[type="text"]::placeholder {
+    color: #aaaaaa;
 }
 
 #search-form button {
-    padding: 10px 20px;
+    padding: 12px 25px;
     border: none;
     border-radius: 5px;
-    background-color: #00e676;
-    color: #121212;
+    background-color: #ff9800;
+    color: #ffffff;
     font-size: 1em;
     cursor: pointer;
     transition: background-color 0.3s ease;
 }
 
 #search-form button:hover {
-    background-color: #00c853;
+    background-color: #e68900;
 }
 
 #search-result {
-    margin-top: 20px;
+    margin-top: 25px;
     text-align: center;
     font-size: 1.2em;
 }
@@ -228,7 +255,25 @@ h2 button:hover {
 /* Loading Indicator Styling */
 .loading-indicator {
     text-align: center;
-    font-size: 1.2em;
-    color: #00e676;
-    margin-top: 20px;
+    font-size: 1.5em;
+    color: #ff9800;
+    margin-top: 30px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #333333;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4d4d4d;
 }
