@@ -11,7 +11,7 @@ from github_api import (
     bulk_unfollow_users,
     get_followers_with_counts,
     get_users_info,
-    get_random_users_with_more_following,
+    get_random_users,
     check_if_user_follows_viewer,
 )
 from data_manager import (
@@ -28,7 +28,7 @@ import atexit
 
 # Import the task functions from the separate files
 from daily_tasks import run_daily_tasks
-from monthly_tasks import run_monthly_tasks  # Updated import
+from monthly_tasks import run_monthly_tasks
 
 app = Flask(__name__)
 
@@ -142,8 +142,8 @@ def get_data():
             data = {'not_following_back': not_following_back_info}
             return jsonify(data)
         elif data_type == 'suggested_users':
-            # Fetch random users who have more following than followers
-            random_users = get_random_users_with_more_following()
+            # Fetch random users
+            random_users = get_random_users()
             # Apply ignore list
             random_users = [user for user in random_users if user['login'] not in ignore_list]
             data = {'suggested_users': random_users}

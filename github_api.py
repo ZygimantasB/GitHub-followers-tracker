@@ -66,13 +66,13 @@ def check_rate_limit():
         return False
     return True
 
-def get_random_users_with_more_following():
-    logger.info("Fetching random users with more following than followers and at least 75 following")
+def get_random_users():
+    logger.info("Fetching random users")
     accumulated_users = []
     per_page = 100  # Maximum allowed by the API
     since = 0  # Starting user ID
     try:
-        while len(accumulated_users) < 2000:  # Fetch until we have enough users
+        while len(accumulated_users) < 2000:
             response = requests.get(
                 f'https://api.github.com/users?per_page={per_page}&since={since}',
                 headers=headers
@@ -89,23 +89,32 @@ def get_random_users_with_more_following():
             if len(accumulated_users) >= 2000:
                 break
             time.sleep(1)  # Sleep to respect rate limits
-        # Fetch detailed info
-        usernames = [user['login'] for user in accumulated_users]
-        users_info = get_users_info_with_more_following(usernames)
-        logger.info(f"Users with more following fetched: {len(users_info)} users")
+
+        # Now, get the list of users we are following
+        following = get_following()
+        following_usernames = set(user['login'] for user in following)
+
+        # Now, for the accumulated users, filter out users we are following
+        usernames = [user['login'] for user in accumulated_users if user['login'] not in following_usernames]
+
+        # Now, fetch user details to get __typename and filter out organizations
+        users_info = get_users_info(usernames)
+        logger.info(f"Total users fetched: {len(users_info)}")
+
         # Filter out organizations
         users_info = [user for user in users_info if user['__typename'] == 'User']
+
         # Select random 50 users
         random_users = random.sample(users_info, min(50, len(users_info)))
         return random_users
     except Exception as e:
-        logger.error(f'Error fetching random users with more following: {e}')
+        logger.error(f'Error fetching random users: {e}')
         return []
 
-def get_users_info_with_more_following(usernames):
+def get_users_info(usernames):
     logger.info(f"Fetching info for users: {usernames}")
     users_info = []
-    for chunk in chunks(usernames, 10):  # Increased chunk size to 10
+    for chunk in chunks(usernames, 5):  # Chunk size of 5
         try:
             query_fragments = []
             for index, username in enumerate(chunk):
@@ -134,59 +143,6 @@ def get_users_info_with_more_following(usernames):
             data = result.get('data', {})
             for key in data:
                 user_data = data[key]
-                if user_data and user_data['__typename'] == 'User':
-                    followers_count = user_data['followers']['totalCount']
-                    following_count = user_data['following']['totalCount']
-                    if (following_count - followers_count >= 25) and following_count >= 75:
-                        users_info.append({
-                            'login': user_data['login'],
-                            'followers': followers_count,
-                            'following': following_count,
-                            'bio': user_data.get('bio', ''),
-                            'public_repos': user_data['repositories']['totalCount'],
-                            '__typename': user_data['__typename'],
-                        })
-            time.sleep(1)
-        except Exception as e:
-            logger.error(f'Error fetching user info: {e}')
-            if 'rate limit' in str(e).lower():
-                logger.info('Waiting for rate limit reset...')
-                time.sleep(60)  # Wait 60 seconds before retrying
-            else:
-                continue
-    return users_info
-
-def get_users_info(usernames):
-    logger.info(f"Fetching info for users: {usernames}")
-    users_info = []
-    for chunk in chunks(usernames, 5):  # Chunk size of 5
-        try:
-            query_fragments = []
-            for index, username in enumerate(chunk):
-                query_fragments.append(f'''
-                    user_{index}: user(login: "{username}") {{
-                        login
-                        followers {{
-                            totalCount
-                        }}
-                        following {{
-                            totalCount
-                        }}
-                        bio
-                        repositories(privacy: PUBLIC) {{
-                            totalCount
-                        }}
-                    }}
-                ''')
-            query = f'''
-            query {{
-                {"".join(query_fragments)}
-            }}
-            '''
-            result = execute_github_graphql_query(query)
-            data = result.get('data', {})
-            for key in data:
-                user_data = data[key]
                 if user_data:
                     users_info.append({
                         'login': user_data['login'],
@@ -194,6 +150,7 @@ def get_users_info(usernames):
                         'following': user_data['following']['totalCount'],
                         'bio': user_data.get('bio', ''),
                         'public_repos': user_data['repositories']['totalCount'],
+                        '__typename': user_data['__typename'],
                     })
             time.sleep(1)
         except Exception as e:
