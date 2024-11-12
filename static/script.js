@@ -2,10 +2,11 @@
 
 function toggleVisibility(id) {
     const element = document.getElementById(id);
-    if (element.style.maxHeight) {
-        element.style.maxHeight = null;
+    const list = element.querySelector('.collapsible-list');
+    if (list.classList.contains('open')) {
+        list.classList.remove('open');
     } else {
-        element.style.maxHeight = element.scrollHeight + "px";
+        list.classList.add('open');
     }
 }
 
@@ -239,6 +240,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const userInfoDiv = document.createElement('div');
             userInfoDiv.className = 'user-info';
 
+            // Add avatar if available
+            if (item.avatar_url) {
+                const avatarImg = document.createElement('img');
+                avatarImg.src = item.avatar_url;
+                avatarImg.alt = `${item.login}'s avatar`;
+                avatarImg.className = 'avatar';
+                userInfoDiv.appendChild(avatarImg);
+            }
+
             const usernameSpan = document.createElement('span');
             usernameSpan.className = 'username';
             usernameSpan.textContent = item.login || item;
@@ -249,17 +259,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (item.followers !== undefined && item.following !== undefined) {
                 const countsSpan = document.createElement('span');
                 countsSpan.className = 'counts';
-                countsSpan.textContent = ` (Followers: ${item.followers}, Following: ${item.following})`;
+                countsSpan.textContent = `Followers: ${item.followers}, Following: ${item.following}`;
                 userInfoDiv.appendChild(countsSpan);
-
-                // For "Users Following More Than Followed", show the difference
-                if (dataType === 'users_more_following') {
-                    const differenceSpan = document.createElement('span');
-                    differenceSpan.className = 'difference';
-                    const diff = item.following - item.followers;
-                    differenceSpan.textContent = ` Difference: ${diff}`;
-                    userInfoDiv.appendChild(differenceSpan);
-                }
             }
 
             // Add additional information for suggested users
@@ -277,33 +278,23 @@ document.addEventListener('DOMContentLoaded', function() {
             buttonGroup.className = 'button-group';
 
             if (['following', 'followers', 'not_following_back', 'unfollowers', 'users_more_following'].includes(dataType)) {
-                const unfollowForm = document.createElement('form');
-                unfollowForm.action = `/unfollow/${item.login || item}`;
-                unfollowForm.method = 'post';
-                unfollowForm.className = 'unfollow-form';
-
                 const unfollowButton = document.createElement('button');
-                unfollowButton.type = 'submit';
                 unfollowButton.className = 'btn-unfollow';
                 unfollowButton.textContent = 'Unfollow';
-
-                unfollowForm.appendChild(unfollowButton);
-                buttonGroup.appendChild(unfollowForm);
+                unfollowButton.addEventListener('click', function() {
+                    unfollowUser(item.login || item, li);
+                });
+                buttonGroup.appendChild(unfollowButton);
             }
 
             if (['new_followers'].includes(dataType)) {
-                const followForm = document.createElement('form');
-                followForm.action = `/follow/${item.login || item}`;
-                followForm.method = 'post';
-                followForm.className = 'follow-form';
-
                 const followButton = document.createElement('button');
-                followButton.type = 'submit';
                 followButton.className = 'btn-follow';
                 followButton.textContent = 'Follow';
-
-                followForm.appendChild(followButton);
-                buttonGroup.appendChild(followForm);
+                followButton.addEventListener('click', function() {
+                    followUser(item.login || item, li);
+                });
+                buttonGroup.appendChild(followButton);
             }
 
             if (buttonGroup.childElementCount > 0) {
@@ -311,52 +302,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             listElement.appendChild(li);
-        });
-
-        addFormEventListeners();
-    }
-
-    function addFormEventListeners() {
-        document.querySelectorAll('.unfollow-form').forEach(form => {
-            form.addEventListener('submit', function(event) {
-                event.preventDefault();
-                const username = this.action.split('/').pop();
-                fetch(this.action, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            this.parentElement.parentElement.style.display = 'none';
-                        } else {
-                            alert('Failed to unfollow ' + username);
-                        }
-                    });
-            });
-        });
-
-        document.querySelectorAll('.follow-form').forEach(form => {
-            form.addEventListener('submit', function(event) {
-                event.preventDefault();
-                const username = this.action.split('/').pop();
-                fetch(this.action, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            this.parentElement.parentElement.style.display = 'none';
-                        } else {
-                            alert('Failed to follow ' + username);
-                        }
-                    });
-            });
         });
     }
 
@@ -368,5 +313,43 @@ document.addEventListener('DOMContentLoaded', function() {
     function hideLoadingIndicator() {
         const loadingIndicator = document.getElementById('loading-indicator');
         loadingIndicator.style.display = 'none';
+    }
+
+    async function unfollowUser(username, listItem) {
+        try {
+            const response = await fetch(`/unfollow/${username}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            const data = await response.json();
+            if (data.success) {
+                listItem.style.display = 'none';
+            } else {
+                alert('Failed to unfollow ' + username);
+            }
+        } catch (error) {
+            console.error('Error unfollowing user:', error);
+        }
+    }
+
+    async function followUser(username, listItem) {
+        try {
+            const response = await fetch(`/follow/${username}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            const data = await response.json();
+            if (data.success) {
+                listItem.style.display = 'none';
+            } else {
+                alert('Failed to follow ' + username);
+            }
+        } catch (error) {
+            console.error('Error following user:', error);
+        }
     }
 });
