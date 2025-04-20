@@ -1,13 +1,117 @@
+// Toggle visibility of collapsible elements
 function toggleVisibility(id) {
     const element = document.getElementById(id);
+    const toggleBtn = document.querySelector(`button[onclick="toggleVisibility('${id}')"] i`);
+
     if (element.style.maxHeight) {
         element.style.maxHeight = null;
+        if (toggleBtn) toggleBtn.className = 'fas fa-chevron-down';
     } else {
         element.style.maxHeight = element.scrollHeight + "px";
+        if (toggleBtn) toggleBtn.className = 'fas fa-chevron-up';
     }
 }
 
+// Theme toggle functionality
+function toggleTheme() {
+    const body = document.body;
+    const themeIcon = document.querySelector('#theme-toggle i');
+
+    if (body.classList.contains('light-theme')) {
+        body.classList.remove('light-theme');
+        themeIcon.className = 'fas fa-moon';
+        localStorage.setItem('theme', 'dark');
+    } else {
+        body.classList.add('light-theme');
+        themeIcon.className = 'fas fa-sun';
+        localStorage.setItem('theme', 'light');
+    }
+}
+
+// Tab navigation
+function openTab(tabId) {
+    // Hide all tab panes
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+
+    // Deactivate all tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Show the selected tab pane
+    document.getElementById(tabId).classList.add('active');
+
+    // Activate the corresponding tab button
+    document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+            <p>${message}</p>
+        </div>
+        <button class="notification-close"><i class="fas fa-times"></i></button>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Add event listener to close button
+    notification.querySelector('.notification-close').addEventListener('click', () => {
+        notification.classList.add('notification-hide');
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    });
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (document.body.contains(notification)) {
+            notification.classList.add('notification-hide');
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+    }, 5000);
+}
+
+// Update dashboard summary
+function updateDashboardSummary() {
+    document.getElementById('followers-count-summary').textContent = 
+        document.getElementById('followers-count').textContent;
+    document.getElementById('following-count-summary').textContent = 
+        document.getElementById('following-count').textContent;
+    document.getElementById('new-followers-count-summary').textContent = 
+        document.getElementById('new-followers-count').textContent;
+    document.getElementById('unfollowers-count-summary').textContent = 
+        document.getElementById('unfollowers-count').textContent;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Apply saved theme
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        document.querySelector('#theme-toggle i').className = 'fas fa-sun';
+    }
+
+    // Theme toggle
+    document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+    // Tab navigation
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            openTab(this.getAttribute('data-tab'));
+        });
+    });
+
     // Handle Load Data buttons
     document.querySelectorAll('.load-data-button').forEach(button => {
         button.addEventListener('click', function() {
@@ -76,10 +180,24 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             showLoadingIndicator();
             const response = await fetch(`/get_data?type=${dataType}`);
+
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+
             const data = await response.json();
+
+            if (data.error) {
+                showNotification(data.error, 'error');
+                return;
+            }
+
             populateData(dataType, data);
+            updateDashboardSummary();
+            showNotification(`${dataType.replace('_', ' ')} data loaded successfully`, 'success');
         } catch (error) {
             console.error('Error fetching data:', error);
+            showNotification(`Failed to load data: ${error.message}`, 'error');
         } finally {
             hideLoadingIndicator();
         }
@@ -88,32 +206,63 @@ document.addEventListener('DOMContentLoaded', function() {
     async function bulkAction(listId, endpoint) {
         const list = document.getElementById(listId);
         const usernames = Array.from(list.querySelectorAll('.list-item .username')).map(span => span.textContent);
-        if (usernames.length > 0) {
-            try {
-                showLoadingIndicator();
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ usernames: usernames })
-                });
-                const results = await response.json();
-                usernames.forEach(username => {
-                    if (results[username] && results[username].success) {
-                        const li = list.querySelector(`.list-item[data-username="${username}"]`);
-                        if (li) {
-                            li.style.display = 'none';
-                        }
-                    } else {
-                        console.error(`Failed to process ${username}: ${results[username].message}`);
-                    }
-                });
-            } catch (error) {
-                console.error('Error during bulk action:', error);
-            } finally {
-                hideLoadingIndicator();
+
+        if (usernames.length === 0) {
+            showNotification('No users to process', 'info');
+            return;
+        }
+
+        try {
+            showLoadingIndicator();
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ usernames: usernames })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
             }
+
+            const results = await response.json();
+            let successCount = 0;
+            let failCount = 0;
+
+            usernames.forEach(username => {
+                if (results[username] && results[username].success) {
+                    const li = list.querySelector(`.list-item[data-username="${username}"]`);
+                    if (li) {
+                        li.classList.add('fade-out');
+                        setTimeout(() => {
+                            li.style.display = 'none';
+                        }, 500);
+                    }
+                    successCount++;
+                } else {
+                    console.error(`Failed to process ${username}: ${results[username]?.message || 'Unknown error'}`);
+                    failCount++;
+                }
+            });
+
+            // Update counts after action
+            updateDashboardSummary();
+
+            // Show appropriate notification
+            if (successCount > 0 && failCount === 0) {
+                showNotification(`Successfully processed ${successCount} users`, 'success');
+            } else if (successCount > 0 && failCount > 0) {
+                showNotification(`Processed ${successCount} users, failed for ${failCount} users`, 'warning');
+            } else {
+                showNotification(`Failed to process any users`, 'error');
+            }
+
+        } catch (error) {
+            console.error('Error during bulk action:', error);
+            showNotification(`Error: ${error.message}`, 'error');
+        } finally {
+            hideLoadingIndicator();
         }
     }
 
@@ -121,69 +270,133 @@ document.addEventListener('DOMContentLoaded', function() {
         const list = document.getElementById('suggested-users-list');
         const selectedCheckboxes = list.querySelectorAll('.list-item input[type="checkbox"]:checked');
         const usernames = Array.from(selectedCheckboxes).map(checkbox => checkbox.dataset.username);
-        if (usernames.length > 0) {
-            try {
-                showLoadingIndicator();
-                const response = await fetch('/bulk_follow', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ usernames: usernames })
-                });
-                const results = await response.json();
-                usernames.forEach(username => {
-                    if (results[username] && results[username].success) {
-                        const li = list.querySelector(`.list-item[data-username="${username}"]`);
-                        if (li) {
-                            li.style.display = 'none';
-                        }
-                    } else {
-                        console.error(`Failed to follow ${username}: ${results[username].message}`);
-                    }
-                });
-            } catch (error) {
-                console.error('Error during following selected users:', error);
-            } finally {
-                hideLoadingIndicator();
+
+        if (usernames.length === 0) {
+            showNotification('No users selected', 'info');
+            return;
+        }
+
+        try {
+            showLoadingIndicator();
+            const response = await fetch('/bulk_follow', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ usernames: usernames })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
             }
-        } else {
-            alert('No users selected.');
+
+            const results = await response.json();
+            let successCount = 0;
+            let failCount = 0;
+
+            usernames.forEach(username => {
+                if (results[username] && results[username].success) {
+                    const li = list.querySelector(`.list-item[data-username="${username}"]`);
+                    if (li) {
+                        li.classList.add('fade-out');
+                        setTimeout(() => {
+                            li.style.display = 'none';
+                        }, 500);
+                    }
+                    successCount++;
+                } else {
+                    console.error(`Failed to follow ${username}: ${results[username]?.message || 'Unknown error'}`);
+                    failCount++;
+                }
+            });
+
+            // Update counts after action
+            updateDashboardSummary();
+
+            // Show appropriate notification
+            if (successCount > 0 && failCount === 0) {
+                showNotification(`Successfully followed ${successCount} users`, 'success');
+            } else if (successCount > 0 && failCount > 0) {
+                showNotification(`Followed ${successCount} users, failed for ${failCount} users`, 'warning');
+            } else {
+                showNotification(`Failed to follow any users`, 'error');
+            }
+
+        } catch (error) {
+            console.error('Error during following selected users:', error);
+            showNotification(`Error: ${error.message}`, 'error');
+        } finally {
+            hideLoadingIndicator();
         }
     }
 
-    // Add this function for the "Follow All" action
+    // Function for the "Follow All" action
     async function followAllSuggestedUsers() {
         const list = document.getElementById('suggested-users-list');
-        const usernames = Array.from(list.querySelectorAll('.list-item')).map(li => li.dataset.username);
-        if (usernames.length > 0) {
-            try {
-                showLoadingIndicator();
-                const response = await fetch('/bulk_follow', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ usernames: usernames })
-                });
-                const results = await response.json();
-                usernames.forEach(username => {
-                    if (results[username] && results[username].success) {
-                        const li = list.querySelector(`.list-item[data-username="${username}"]`);
-                        if (li) {
-                            li.style.display = 'none';
-                        }
-                    } else {
-                        console.error(`Failed to follow ${username}: ${results[username].message}`);
-                    }
-                });
-            } catch (error) {
-                console.error('Error during following all suggested users:', error);
-            } finally {
-                hideLoadingIndicator();
+        const userItems = list.querySelectorAll('.list-item');
+        const usernames = Array.from(userItems).map(li => li.dataset.username);
+
+        if (usernames.length === 0) {
+            showNotification('No users available to follow', 'info');
+            return;
+        }
+
+        // Confirm before following all users
+        if (!confirm(`Are you sure you want to follow all ${usernames.length} users?`)) {
+            return;
+        }
+
+        try {
+            showLoadingIndicator();
+            const response = await fetch('/bulk_follow', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ usernames: usernames })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
             }
-        } else {
-            alert('No users available to follow.');
+
+            const results = await response.json();
+            let successCount = 0;
+            let failCount = 0;
+
+            usernames.forEach(username => {
+                if (results[username] && results[username].success) {
+                    const li = list.querySelector(`.list-item[data-username="${username}"]`);
+                    if (li) {
+                        li.classList.add('fade-out');
+                        setTimeout(() => {
+                            li.style.display = 'none';
+                        }, 500);
+                    }
+                    successCount++;
+                } else {
+                    console.error(`Failed to follow ${username}: ${results[username]?.message || 'Unknown error'}`);
+                    failCount++;
+                }
+            });
+
+            // Update counts after action
+            updateDashboardSummary();
+
+            // Show appropriate notification
+            if (successCount > 0 && failCount === 0) {
+                showNotification(`Successfully followed all ${successCount} users`, 'success');
+            } else if (successCount > 0 && failCount > 0) {
+                showNotification(`Followed ${successCount} users, failed for ${failCount} users`, 'warning');
+            } else {
+                showNotification(`Failed to follow any users`, 'error');
+            }
+
+        } catch (error) {
+            console.error('Error during following all suggested users:', error);
+            showNotification(`Error: ${error.message}`, 'error');
+        } finally {
+            hideLoadingIndicator();
         }
     }
 
@@ -225,9 +438,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update counts
         if (countElement) {
             countElement.textContent = dataList.length;
+
+            // Also update the dashboard summary if applicable
+            const summaryElement = document.getElementById(`${counts[dataType]}-summary`);
+            if (summaryElement) {
+                summaryElement.textContent = dataList.length;
+            }
         }
+
         // Clear existing list
         listElement.innerHTML = '';
+
+        // Ensure the list is visible if it has items
+        if (dataList.length > 0 && !listElement.style.maxHeight) {
+            toggleVisibility(lists[dataType]);
+        }
 
         dataList.forEach(item => {
             const li = document.createElement('li');

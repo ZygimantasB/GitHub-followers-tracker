@@ -2,99 +2,287 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GitHub Follower Tracker</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
 
-<div class="container">
-  <h1>GitHub Follower Tracker</h1>
-
-  <!-- Search Box -->
-  <div id="search-section">
-    <h2>Search User</h2>
-    <form id="search-form">
-      <input type="text" id="search-username" placeholder="Enter GitHub username" required>
-      <button type="submit">Search</button>
-    </form>
-    <div id="search-result"></div>
+<header class="app-header">
+  <div class="logo">
+    <i class="fab fa-github"></i>
+    <h1>GitHub Follower Tracker</h1>
   </div>
+  <nav class="main-nav">
+    <button id="theme-toggle" class="theme-toggle">
+      <i class="fas fa-moon"></i>
+    </button>
+  </nav>
+</header>
+
+<div class="container">
+  <!-- Search Box -->
+  <section id="search-section" class="card">
+    <div class="card-header">
+      <h2><i class="fas fa-search"></i> Search User</h2>
+    </div>
+    <div class="card-body">
+      <form id="search-form">
+        <div class="input-group">
+          <input type="text" id="search-username" placeholder="Enter GitHub username" required>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i> Search
+          </button>
+        </div>
+      </form>
+      <div id="search-result" class="search-result"></div>
+    </div>
+  </section>
+
+  <!-- Dashboard Summary -->
+  <section class="dashboard-summary">
+    <div class="stat-card">
+      <i class="fas fa-users"></i>
+      <div class="stat-info">
+        <h3>Followers</h3>
+        <p id="followers-count-summary">0</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <i class="fas fa-user-friends"></i>
+      <div class="stat-info">
+        <h3>Following</h3>
+        <p id="following-count-summary">0</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <i class="fas fa-user-plus"></i>
+      <div class="stat-info">
+        <h3>New Followers</h3>
+        <p id="new-followers-count-summary">0</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <i class="fas fa-user-minus"></i>
+      <div class="stat-info">
+        <h3>Unfollowers</h3>
+        <p id="unfollowers-count-summary">0</p>
+      </div>
+    </div>
+  </section>
 
   <!-- Loading Indicator -->
   <div id="loading-indicator" class="loading-indicator" style="display: none;">
-    Loading data, please wait...
+    <div class="spinner"></div>
+    <p>Loading data, please wait...</p>
   </div>
 
-  <!-- Followers -->
-  <h2 onclick="toggleVisibility('followers-list')">
-    Followers (<span id="followers-count">0</span>)
-    <button class="load-data-button" data-type="followers">Load Data</button>
-    <button id="unfollow-all-followers-button">Unfollow All</button>
-  </h2>
-  <ul id="followers-list" class="collapsible-list">
-    <!-- Followers will be populated here -->
-  </ul>
+  <!-- Main Content Tabs -->
+  <div class="tabs-container">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="followers-tab">
+        <i class="fas fa-users"></i> Followers
+      </button>
+      <button class="tab-btn" data-tab="following-tab">
+        <i class="fas fa-user-friends"></i> Following
+      </button>
+      <button class="tab-btn" data-tab="new-followers-tab">
+        <i class="fas fa-user-plus"></i> New Followers
+      </button>
+      <button class="tab-btn" data-tab="unfollowers-tab">
+        <i class="fas fa-user-minus"></i> Unfollowers
+      </button>
+      <button class="tab-btn" data-tab="not-following-back-tab">
+        <i class="fas fa-user-slash"></i> Not Following Back
+      </button>
+      <button class="tab-btn" data-tab="suggested-users-tab">
+        <i class="fas fa-user-tag"></i> Suggested Users
+      </button>
+      <button class="tab-btn" data-tab="users-more-following-tab">
+        <i class="fas fa-chart-line"></i> Following > Followers
+      </button>
+    </div>
 
-  <!-- Following -->
-  <h2 onclick="toggleVisibility('following-list')">
-    Following (<span id="following-count">0</span>)
-    <button class="load-data-button" data-type="following">Load Data</button>
-    <button id="unfollow-all-following-button">Unfollow All</button>
-  </h2>
-  <ul id="following-list" class="collapsible-list">
-    <!-- Following will be populated here -->
-  </ul>
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- Followers Tab -->
+      <div id="followers-tab" class="tab-pane active">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-users"></i> Followers (<span id="followers-count">0</span>)</h2>
+            <div class="card-actions">
+              <button class="btn btn-primary load-data-button" data-type="followers">
+                <i class="fas fa-sync-alt"></i> Load Data
+              </button>
+              <button id="unfollow-all-followers-button" class="btn btn-danger">
+                <i class="fas fa-user-minus"></i> Unfollow All
+              </button>
+              <button class="btn btn-secondary toggle-btn" onclick="toggleVisibility('followers-list')">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul id="followers-list" class="user-list collapsible-list">
+              <!-- Followers will be populated here -->
+            </ul>
+          </div>
+        </section>
+      </div>
 
-  <!-- New Followers -->
-  <h2 onclick="toggleVisibility('new-followers-list')">
-    New Followers (<span id="new-followers-count">0</span>)
-    <button class="load-data-button" data-type="new_followers">Load Data</button>
-    <button id="follow-all-new-followers-button">Follow All</button>
-  </h2>
-  <ul id="new-followers-list" class="collapsible-list">
-    <!-- New followers will be populated here -->
-  </ul>
+      <!-- Following Tab -->
+      <div id="following-tab" class="tab-pane">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-user-friends"></i> Following (<span id="following-count">0</span>)</h2>
+            <div class="card-actions">
+              <button class="btn btn-primary load-data-button" data-type="following">
+                <i class="fas fa-sync-alt"></i> Load Data
+              </button>
+              <button id="unfollow-all-following-button" class="btn btn-danger">
+                <i class="fas fa-user-minus"></i> Unfollow All
+              </button>
+              <button class="btn btn-secondary toggle-btn" onclick="toggleVisibility('following-list')">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul id="following-list" class="user-list collapsible-list">
+              <!-- Following will be populated here -->
+            </ul>
+          </div>
+        </section>
+      </div>
 
-  <!-- Unfollowers -->
-  <h2 onclick="toggleVisibility('unfollowers-list')">
-    Unfollowers (<span id="unfollowers-count">0</span>)
-    <button class="load-data-button" data-type="unfollowers">Load Data</button>
-    <button id="unfollow-all-unfollowers-button">Unfollow All</button>
-  </h2>
-  <ul id="unfollowers-list" class="collapsible-list">
-    <!-- Unfollowers will be populated here -->
-  </ul>
+      <!-- New Followers Tab -->
+      <div id="new-followers-tab" class="tab-pane">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-user-plus"></i> New Followers (<span id="new-followers-count">0</span>)</h2>
+            <div class="card-actions">
+              <button class="btn btn-primary load-data-button" data-type="new_followers">
+                <i class="fas fa-sync-alt"></i> Load Data
+              </button>
+              <button id="follow-all-new-followers-button" class="btn btn-success">
+                <i class="fas fa-user-plus"></i> Follow All
+              </button>
+              <button class="btn btn-secondary toggle-btn" onclick="toggleVisibility('new-followers-list')">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul id="new-followers-list" class="user-list collapsible-list">
+              <!-- New followers will be populated here -->
+            </ul>
+          </div>
+        </section>
+      </div>
 
-  <!-- Not Following Back -->
-  <h2 onclick="toggleVisibility('not-following-back-list')">
-    Not Following Back (<span id="not-following-back-count">0</span>)
-    <button class="load-data-button" data-type="not_following_back">Load Data</button>
-    <button id="unfollow-all-not-following-back-button">Unfollow All</button>
-  </h2>
-  <ul id="not-following-back-list" class="collapsible-list">
-    <!-- Not following back will be populated here -->
-  </ul>
+      <!-- Unfollowers Tab -->
+      <div id="unfollowers-tab" class="tab-pane">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-user-minus"></i> Unfollowers (<span id="unfollowers-count">0</span>)</h2>
+            <div class="card-actions">
+              <button class="btn btn-primary load-data-button" data-type="unfollowers">
+                <i class="fas fa-sync-alt"></i> Load Data
+              </button>
+              <button id="unfollow-all-unfollowers-button" class="btn btn-danger">
+                <i class="fas fa-user-minus"></i> Unfollow All
+              </button>
+              <button class="btn btn-secondary toggle-btn" onclick="toggleVisibility('unfollowers-list')">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul id="unfollowers-list" class="user-list collapsible-list">
+              <!-- Unfollowers will be populated here -->
+            </ul>
+          </div>
+        </section>
+      </div>
 
-  <!-- Suggested Users -->
-  <h2 onclick="toggleVisibility('suggested-users-list')">
-    Suggested Users (<span id="suggested-users-count">0</span>)
-    <button class="load-data-button" data-type="suggested_users">Load Data</button>
-    <button id="follow-selected-suggested-users-button">Follow Selected</button>
-    <button id="follow-all-suggested-users-button">Follow All</button>
-  </h2>
-  <ul id="suggested-users-list" class="collapsible-list">
-    <!-- Suggested users will be populated here -->
-  </ul>
+      <!-- Not Following Back Tab -->
+      <div id="not-following-back-tab" class="tab-pane">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-user-slash"></i> Not Following Back (<span id="not-following-back-count">0</span>)</h2>
+            <div class="card-actions">
+              <button class="btn btn-primary load-data-button" data-type="not_following_back">
+                <i class="fas fa-sync-alt"></i> Load Data
+              </button>
+              <button id="unfollow-all-not-following-back-button" class="btn btn-danger">
+                <i class="fas fa-user-minus"></i> Unfollow All
+              </button>
+              <button class="btn btn-secondary toggle-btn" onclick="toggleVisibility('not-following-back-list')">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul id="not-following-back-list" class="user-list collapsible-list">
+              <!-- Not following back will be populated here -->
+            </ul>
+          </div>
+        </section>
+      </div>
 
-  <!-- Users Following More Than Followed -->
-  <h2 onclick="toggleVisibility('users-more-following-list')">
-    Users Following More Than Followed (<span id="users-more-following-count">0</span>)
-    <button class="load-data-button" data-type="users_more_following">Load Data</button>
-    <!-- No "Unfollow All" button here -->
-  </h2>
-  <ul id="users-more-following-list" class="collapsible-list">
-    <!-- Users will be populated here -->
-  </ul>
+      <!-- Suggested Users Tab -->
+      <div id="suggested-users-tab" class="tab-pane">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-user-tag"></i> Suggested Users (<span id="suggested-users-count">0</span>)</h2>
+            <div class="card-actions">
+              <button class="btn btn-primary load-data-button" data-type="suggested_users">
+                <i class="fas fa-sync-alt"></i> Load Data
+              </button>
+              <button id="follow-selected-suggested-users-button" class="btn btn-success">
+                <i class="fas fa-check-square"></i> Follow Selected
+              </button>
+              <button id="follow-all-suggested-users-button" class="btn btn-success">
+                <i class="fas fa-user-plus"></i> Follow All
+              </button>
+              <button class="btn btn-secondary toggle-btn" onclick="toggleVisibility('suggested-users-list')">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul id="suggested-users-list" class="user-list collapsible-list">
+              <!-- Suggested users will be populated here -->
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <!-- Users Following More Than Followed Tab -->
+      <div id="users-more-following-tab" class="tab-pane">
+        <section class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-chart-line"></i> Users Following More Than Followed (<span id="users-more-following-count">0</span>)</h2>
+            <div class="card-actions">
+              <button class="btn btn-primary load-data-button" data-type="users_more_following">
+                <i class="fas fa-sync-alt"></i> Load Data
+              </button>
+              <button class="btn btn-secondary toggle-btn" onclick="toggleVisibility('users-more-following-list')">
+                <i class="fas fa-chevron-down"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul id="users-more-following-list" class="user-list collapsible-list">
+              <!-- Users will be populated here -->
+            </ul>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
 
 </div>
 
