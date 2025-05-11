@@ -1,25 +1,31 @@
-```markdown
 # GitHub Follower Tracker
-```
-This project is a simple Flask web application that tracks your GitHub followers, following, unfollowers, and new followers. 
-It allows you to monitor changes in your GitHub social connections, filter out certain users, and see which users are not following you back.
+
+This project is a Flask web application that helps you manage and track your GitHub social connections. It provides a comprehensive dashboard to monitor your followers, following, unfollowers, and new followers, with additional features for user management and automated actions.
 
 ## Features
 
-- **Followers**: View a list of all users currently following you.
-- **Following**: View a list of all users you are currently following.
-- **Unfollowers**: See users who have unfollowed you since the last time you checked.
-- **Not Following Back**: View users you follow but who do not follow you back.
+- **Followers Dashboard**: View a list of all users currently following you with their follower/following counts.
+- **Following Management**: See all users you're following and easily unfollow them if needed.
+- **Unfollowers Tracking**: Identify users who have unfollowed you since the last time you checked.
+- **Not Following Back**: View users you follow who don't follow you back, with an option to exclude specific users via an ignore list.
 - **New Followers**: Track users who have followed you within the last 3 days.
-- **Ignore List**: Specify users who should be excluded from the "Not Following Back" list.
-```
+- **Suggested Users**: Discover new users to follow based on activity and follower counts.
+- **Following > Followers**: Find users who follow more people than they have followers (potential follow-back users).
+- **User Search**: Check if a specific user follows you.
+- **Bulk Actions**: Follow or unfollow multiple users at once.
+- **Automated Tasks**: Daily task to automatically follow suggested users and monthly task to unfollow users who don't follow you back.
+- **Dark/Light Theme**: Toggle between dark and light themes for comfortable viewing.
+- **Responsive Design**: Works well on both desktop and mobile devices.
 ## Requirements
 
 - **Python 3.6+**
-- **Flask**: A lightweight WSGI web application framework.
-- **Requests**: A simple HTTP library for Python.
-- **GitHub API Token**: A GitHub personal access token to authenticate API requests.
-```
+- **Flask**: A lightweight WSGI web application framework
+- **Requests**: HTTP library for making API calls to GitHub
+- **APScheduler**: For scheduling automated tasks
+- **python-decouple**: For reading environment variables from .env file
+- **GitHub API Token**: A GitHub personal access token to authenticate API requests
+
+The full list of dependencies can be found in the `requirements.txt` file.
 
 ## Setup
 
@@ -27,7 +33,7 @@ It allows you to monitor changes in your GitHub social connections, filter out c
 
 ```bash
 git clone https://github.com/yourusername/GitHub-followers-tracker.git
-cd GitHub-followers-tracker.git
+cd GitHub-followers-tracker
 ```
 
 ### 2. Set Up a Virtual Environment (Optional but Recommended)
@@ -39,7 +45,7 @@ source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 
 ### 3. Install the Required Dependencies
 
-You can install the required dependencies using the `requirements.txt` file included in the repository:
+Install the required dependencies using the `requirements.txt` file:
 
 ```bash
 pip install -r requirements.txt
@@ -49,150 +55,147 @@ pip install -r requirements.txt
 
 #### Creating the `.env` File
 
-- In the project root, you will find a file named `.env.example`. This file contains placeholders for your GitHub username and API token.
-- **Rename** this file to `.env`.
-
-```bash
-mv .env.example .env
-```
-
-- Open the `.env` file and replace the placeholders with your actual GitHub username and API token.
+Create a `.env` file in the project root with your GitHub username and API token:
 
 ```env
 GITHUB_USERNAME=your_github_username
 GITHUB_TOKEN=your_github_personal_access_token
 ```
 
-#### Renaming Example Files
+You can obtain a GitHub personal access token by following these steps:
+1. Go to your GitHub account settings
+2. Select "Developer settings" from the sidebar
+3. Click on "Personal access tokens" and then "Tokens (classic)"
+4. Click "Generate new token" and select the appropriate scopes (at minimum, you need `user:follow`)
+5. Copy the generated token and paste it into your `.env` file
 
-To ensure the application runs correctly, you need to rename the example files to their correct names:
+#### Setting Up Data Files
 
-- **Rename** `ignore_list.txt.example` to `ignore_list.txt`:
-  ```bash
-  mv ignore_list.txt.example ignore_list.txt
-  ```
+The application uses several files to track followers and manage user data. Create these empty files in the project root:
 
-- **Rename** `new_followers.json.example` to `new_followers.json`:
-  ```bash
-  mv new_followers.json.example new_followers.json
-  ```
-
-- **Rename** `previous_followers.txt.example` to `previous_followers.txt`:
-  ```bash
-  mv previous_followers.txt.example previous_followers.txt
-  ```
+- `ignore_list.txt`: Add GitHub usernames (one per line) that you want to exclude from the "Not Following Back" list
+- `new_followers.json`: This will be automatically populated with new followers and their timestamps
+- `previous_followers.txt`: This will be automatically populated with your current followers list
 
 These files are essential for tracking followers, filtering users, and recording changes.
 
-#### Why You Need the `.env` and Other Files
+#### Understanding the Data Files
 
-- **GitHub Username**: This is your GitHub handle. It is required to fetch your followers and following lists.
-- **GitHub API Token**: This token is used to authenticate requests to the GitHub API. While the script can work without it, the GitHub API has rate limits for unauthenticated requests. Using a token allows for a higher rate limit, especially useful if you have many followers.
-- **ignore_list.txt**: This file is used to exclude certain users from the "Not Following Back" section.
-- **new_followers.json**: This file tracks new followers along with the time they started following you.
-- **previous_followers.txt**: This file keeps a record of your previous followers to determine who has unfollowed you.
+- **ignore_list.txt**: This file lets you specify users who should be excluded from the "Not Following Back" section. This is useful for accounts you want to follow regardless of whether they follow you back (e.g., official accounts, friends, etc.).
+- **new_followers.json**: This file stores information about new followers, including when they started following you. The application uses this to display users who followed you within the last 3 days.
+- **previous_followers.txt**: This file keeps a record of your followers from the last time you ran the application. It's used to determine who has unfollowed you since then.
 
-### 5. File Structure
+### 5. Project Structure
 
-Ensure your project directory looks like this:
+The project directory is organized as follows:
 
 ```
 GitHub-followers-tracker/
 │
-├── app.py                          # The main Flask application
+├── app.py                          # Main Flask application
+├── github_api.py                   # GitHub API interaction functions
+├── data_manager.py                 # Data persistence functions
+├── utils.py                        # Utility functions
+├── daily_tasks.py                  # Automated daily tasks
+├── monthly_tasks.py                # Automated monthly tasks
 ├── previous_followers.txt          # Stores the list of previous followers
 ├── new_followers.json              # Stores new followers with timestamps
 ├── ignore_list.txt                 # Stores usernames to ignore
+├── user_following_cache.json       # Cache for API responses
 ├── requirements.txt                # Lists all the Python dependencies
+├── .env                            # Environment variables
 ├── static/
-│   └── styles.css                  # The CSS file for styling the HTML pages
+│   ├── styles.css                  # CSS styles for the application
+│   └── script.js                   # JavaScript for frontend functionality
 ├── templates/
-│   └── index.html                  # The HTML template for the main page
-└── .env/                          # Virtual environment directory (optional, but recommended)
+│   └── index.html                  # HTML template for the main page
+└── .venv/                          # Virtual environment directory (optional)
 ```
 
-### 6. Explanation of Key Files
+### 6. Key Components
 
-#### `.env`
+#### Core Files
 
-- **Purpose**: Stores your GitHub username and personal access token securely.
-- **Usage**: The Flask application reads this file to authenticate API requests and fetch your follower data.
+- **app.py**: The main Flask application that handles HTTP requests, renders templates, and manages the application flow. It also sets up scheduled tasks using APScheduler.
+- **github_api.py**: Contains functions for interacting with the GitHub API, including fetching followers/following lists, following/unfollowing users, and handling rate limits.
+- **data_manager.py**: Manages data persistence, including loading and saving followers, new followers, and the ignore list.
+- **utils.py**: Contains utility functions used throughout the application, such as caching and list chunking.
 
-#### `previous_followers.txt`
+#### Scheduled Tasks
 
-- **Purpose**: Keeps a record of your followers from the last time you ran the script.
-- **Usage**: This file is automatically generated and updated by the script. It is used to determine who has unfollowed you and who is new.
+- **daily_tasks.py**: Contains the automated daily task that runs at 6 AM to follow random suggested users.
+- **monthly_tasks.py**: Contains the automated monthly task that runs at 1 AM on the first day of each month to unfollow users who don't follow back.
 
-#### `new_followers.json`
+#### Data Files
 
-- **Purpose**: Stores a list of new followers along with the timestamp of when they followed you.
-- **Usage**: This file is automatically generated and updated by the script. It is used to track new followers and display them in the "New Followers" section for up to 3 days.
+- **previous_followers.txt**: Stores the list of your followers from the last check to identify unfollowers.
+- **new_followers.json**: Tracks new followers with timestamps to show recent followers (within 3 days).
+- **ignore_list.txt**: Contains usernames to exclude from the "Not Following Back" list.
+- **user_following_cache.json**: Caches API responses to reduce the number of API calls and improve performance.
 
-#### `ignore_list.txt`
+#### Frontend Files
 
-- **Purpose**: Allows you to specify usernames that should be excluded from the "Not Following Back" list.
-- **Usage**: Manually create this file and list one username per line. The script will read this file and exclude those users from the "Not Following Back" section.
+- **templates/index.html**: The main HTML template that defines the structure of the web interface.
+- **static/styles.css**: Contains all the CSS styles for the application, including dark/light theme support.
+- **static/script.js**: Contains the JavaScript code for frontend functionality, including API calls, UI updates, and user interactions.
 
 ### 7. Running the Application
 
 Start the Flask development server by running:
 
 ```bash
-FLASK_APP=app.py flask run
+python app.py
 ```
 
-Or on Windows:
+This will start the server on port 9999. Open your web browser and go to `http://localhost:9999/` to view the application.
 
-```bash
-set FLASK_APP=app.py
-flask run
-```
+### 8. Using the Application
 
-Then open your web browser and go to `http://127.0.0.1:5000/` to view the application.
+#### Dashboard Overview
 
-### 8. Usage
+The application provides a dashboard with summary statistics and several tabs for different features:
 
-- **Followers**: Click on the "Followers" section to expand and see your current followers.
-- **Following**: Click on the "Following" section to expand and see who you're following.
-- **Unfollowers**: Click on the "Unfollowers" section to see who has unfollowed you since the last check.
-- **Not Following Back**: Click on the "Not Following Back" section to see users you follow who do not follow you back, excluding those in your `ignore_list.txt`.
-- **New Followers**: Click on the "New Followers" section to see who has started following you in the last 3 days.
+- **Followers**: View all users currently following you, with their follower and following counts.
+- **Following**: View all users you're currently following, with options to unfollow.
+- **New Followers**: See users who have started following you in the last 3 days.
+- **Unfollowers**: See users who have unfollowed you since the last check.
+- **Not Following Back**: View users you follow who don't follow you back (excluding those in your ignore list).
+- **Suggested Users**: Discover new users to follow based on activity and follower counts.
+- **Following > Followers**: Find users who follow more people than they have followers.
 
-### 9. Customization
+#### User Actions
 
-- **Ignore List**: Add usernames to `ignore_list.txt` to exclude them from the "Not Following Back" list.
-- **New Follower Retention**: The `app.py` script is configured to show new followers for 3 days. You can modify the `timedelta(days=3)` in the script to change this duration.
+For each user displayed in the lists, you can perform various actions:
 
-### 10. License
+- **Follow/Unfollow**: Follow or unfollow individual users with a single click.
+- **Bulk Actions**: Select multiple users to follow or unfollow at once.
+- **Search**: Use the search box to check if a specific user follows you.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+#### Theme Toggle
 
-### 11. Contributing
+Toggle between dark and light themes using the moon/sun icon in the top-right corner of the application.
 
-If you'd like to contribute, please fork the repository and use a feature branch. Pull requests are warmly welcome.
+### 9. Automated Tasks
 
-### 12. Troubleshooting
+The application includes two automated tasks:
 
-If you encounter a `JSONDecodeError` when running the application, it might be due to an empty or malformed `new_followers.json` file. The script has been designed to handle such cases by reinitializing the file as necessary.
+1. **Daily Task (6 AM)**: Automatically follows random suggested users to help grow your network.
+2. **Monthly Task (1 AM on the 1st of each month)**: Automatically unfollows users who don't follow you back.
 
----
+These tasks run in the background as long as the application is running. You can modify the scheduling in `app.py` if needed.
 
-This project is a simple tool for managing and tracking your GitHub followers. It can be extended with additional features, such as notifications or integration with other platforms.
-```
+### 10. Customization
 
-### Summary of Additions:
+- **Ignore List**: Add usernames to `ignore_list.txt` (one per line) to exclude them from the "Not Following Back" list and automated unfollowing.
+- **New Follower Retention**: The application is configured to show new followers for 3 days. You can modify the `timedelta(days=3)` in `app.py` to change this duration.
+- **Rate Limiting**: The application includes sophisticated rate limiting to avoid hitting GitHub API limits. You can adjust the thresholds in `github_api.py` if needed.
 
-1. **Renaming Example Files**: Instructions are added for renaming `ignore_list.txt.example`, `new_followers.json.example`, and `previous_followers.txt.example` to their proper file names.
-2. **Explanation**: The README now clearly explains why these files are needed and how they interact with the script.
-```
+### 11. Troubleshooting
 
-### `requirements.txt`
+- **API Rate Limits**: If you encounter rate limit errors, the application will automatically slow down requests. You may need to wait for the rate limit to reset.
+- **Empty Data Files**: If you encounter JSON decode errors, it might be due to empty or malformed data files. The application should handle these cases automatically by reinitializing the files.
+- **Authentication Issues**: Ensure your GitHub token has the correct permissions (at minimum, `user:follow` scope).
 
-Here is the `requirements.txt` file again, which should be placed in your project’s root directory:
+### 12. Contributing
 
-```plaintext
-Flask==2.1.2
-requests==2.28.1
-python-decouple==3.8
-requests==2.32.3
-```
+If you'd like to contribute to this project, please fork the repository and create a pull request with your changes. Bug reports, feature requests, and feedback are always welcome.

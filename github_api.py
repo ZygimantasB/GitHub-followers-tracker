@@ -24,29 +24,39 @@ session.headers.update({
 RATE_LIMIT_THRESHOLD = 100  # Minimum remaining requests before slowing down
 MIN_REQUEST_INTERVAL = 0.1  # Minimum time between requests in seconds
 
-last_request_time = 0
+# Use a lock for thread-safe throttling
+import threading
+_throttle_lock = threading.Lock()
+_last_request_time = 0
 
 def throttle_requests():
-    """Throttle requests to avoid hitting rate limits."""
-    global last_request_time
-    current_time = time.time()
-    elapsed_time = current_time - last_request_time
+    """Throttle requests to avoid hitting rate limits in a thread-safe manner."""
+    global _last_request_time
 
-    # If we've made a request recently, wait a bit
-    if elapsed_time < MIN_REQUEST_INTERVAL:
-        time.sleep(MIN_REQUEST_INTERVAL - elapsed_time)
+    with _throttle_lock:
+        current_time = time.time()
+        elapsed_time = current_time - _last_request_time
 
-    last_request_time = time.time()
+        # If we've made a request recently, wait a bit
+        if elapsed_time < MIN_REQUEST_INTERVAL:
+            sleep_time = MIN_REQUEST_INTERVAL - elapsed_time
+            time.sleep(sleep_time)
+
+        # Update the last request time after potentially sleeping
+        _last_request_time = time.time()
 
 def execute_github_graphql_query(query, variables=None, retry_count=3):
     """Execute a GraphQL query with automatic retries and error handling."""
     url = 'https://api.github.com/graphql'
     payload = {'query': query, 'variables': variables or {}}
 
+    # Skip rate limit check for rate limit query itself to avoid recursion
+    is_rate_limit_query = 'rateLimit' in query and 'cost' in query and 'remaining' in query
+
     for attempt in range(retry_count):
         try:
-            # Check rate limits before making request
-            if attempt == 0 and not check_rate_limit(quiet=True):
+            # Check rate limits before making request, but only if this isn't the rate limit query itself
+            if attempt == 0 and not is_rate_limit_query and not check_rate_limit(quiet=True):
                 logger.warning("Approaching rate limit, slowing down requests")
                 time.sleep(5)  # Wait longer if we're close to the rate limit
 
@@ -95,9 +105,24 @@ def execute_github_graphql_query(query, variables=None, retry_count=3):
 
     raise Exception(f"Failed after {retry_count} attempts")
 
-@lru_cache(maxsize=1)
+# Cache for rate limit status
+_rate_limit_cache = {
+    'data': None,
+    'timestamp': 0
+}
+# Cache expiration time in seconds
+RATE_LIMIT_CACHE_TTL = 60  # Only check rate limit once per minute
+
 def get_rate_limit_status():
     """Get current rate limit status with caching to avoid unnecessary requests."""
+    global _rate_limit_cache
+
+    current_time = time.time()
+    # If cache is valid, return cached data
+    if _rate_limit_cache['data'] and (current_time - _rate_limit_cache['timestamp'] < RATE_LIMIT_CACHE_TTL):
+        return _rate_limit_cache['data']
+
+    # Cache expired or not set, fetch new data
     query = '''
     {
       rateLimit {
@@ -110,6 +135,11 @@ def get_rate_limit_status():
     '''
     result = execute_github_graphql_query(query)
     rate_limit = result['data']['rateLimit']
+
+    # Update cache
+    _rate_limit_cache['data'] = rate_limit
+    _rate_limit_cache['timestamp'] = current_time
+
     logger.debug(f"Rate limit status: {rate_limit}")
     return rate_limit
 
