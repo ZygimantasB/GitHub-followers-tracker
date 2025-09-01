@@ -593,3 +593,134 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingIndicator.style.display = 'none';
     }
 });
+
+
+// ===== Ignore List Management (Web UI) =====
+async function fetchIgnoreList() {
+    const res = await fetch('/api/ignore-list');
+    if (!res.ok) throw new Error('Failed to load ignore list');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.ignore_list || [];
+}
+
+function renderIgnoreList(usernames) {
+    const listEl = document.getElementById('ignore-list');
+    const countEl = document.getElementById('ignore-list-count');
+    if (!listEl || !countEl) return;
+    listEl.innerHTML = '';
+    countEl.textContent = usernames.length;
+
+    if (usernames.length > 0 && !listEl.style.maxHeight) {
+        // ensure visible if collapsed
+        toggleVisibility('ignore-list');
+    }
+
+    usernames.forEach(u => {
+        const li = document.createElement('li');
+        li.className = 'list-item';
+        li.dataset.username = u;
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'user-info';
+        const span = document.createElement('span');
+        span.className = 'username';
+        span.textContent = u;
+        infoDiv.appendChild(span);
+        li.appendChild(infoDiv);
+
+        const btnGroup = document.createElement('div');
+        btnGroup.className = 'button-group';
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn btn-danger';
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', async () => {
+            try {
+                const updated = await removeIgnoreUsername(u);
+                renderIgnoreList(updated);
+                showNotification(`Removed ${u} from ignore list`, 'success');
+            } catch (e) {
+                console.error(e);
+                showNotification(`Failed to remove: ${e.message}`, 'error');
+            }
+        });
+        btnGroup.appendChild(removeBtn);
+        li.appendChild(btnGroup);
+
+        listEl.appendChild(li);
+    });
+}
+
+async function addIgnoreUsername(username) {
+    const res = await fetch('/api/ignore-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+    });
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.ignore_list || [];
+}
+
+async function removeIgnoreUsername(username) {
+    const res = await fetch('/api/ignore-list', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+    });
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.ignore_list || [];
+}
+
+// Bind events when DOM is ready (separate listener to avoid touching existing code)
+document.addEventListener('DOMContentLoaded', function() {
+    const section = document.getElementById('ignore-list-section');
+    if (!section) return;
+
+    const form = document.getElementById('ignore-list-form');
+    const input = document.getElementById('ignore-username-input');
+    const refreshBtn = document.getElementById('refresh-ignore-list');
+
+    const load = async () => {
+        try {
+            const list = await fetchIgnoreList();
+            renderIgnoreList(list);
+        } catch (e) {
+            console.error(e);
+            showNotification(`Failed to load ignore list: ${e.message}`, 'error');
+        }
+    };
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            load();
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = (input.value || '').trim();
+            if (!username) {
+                showNotification('Please enter a username', 'warning');
+                return;
+            }
+            try {
+                const updated = await addIgnoreUsername(username);
+                input.value = '';
+                renderIgnoreList(updated);
+                showNotification(`Added ${username} to ignore list`, 'success');
+            } catch (e) {
+                console.error(e);
+                showNotification(`Failed to add: ${e.message}`, 'error');
+            }
+        });
+    }
+
+    // Initial load
+    load();
+});

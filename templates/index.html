@@ -79,6 +79,30 @@
     <p>Loading data, please wait...</p>
   </div>
 
+  <!-- Ignore List Management -->
+  <section id="ignore-list-section" class="card">
+    <div class="card-header">
+      <h2><i class="fas fa-ban"></i> Ignore List (<span id="ignore-list-count">0</span>)</h2>
+      <div class="card-actions">
+        <button class="btn btn-primary" id="refresh-ignore-list">
+          <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+        <button class="btn btn-secondary toggle-btn" onclick="toggleVisibility('ignore-list')">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <form id="ignore-list-form" class="input-group">
+        <input type="text" id="ignore-username-input" placeholder="Enter username to ignore" required>
+        <button type="submit" class="btn btn-warning">
+          <i class="fas fa-user-slash"></i> Add to Ignore
+        </button>
+      </form>
+      <ul id="ignore-list" class="collapsible-list" style="max-height: 0; overflow: hidden;"></ul>
+    </div>
+  </section>
+
   <!-- Main Content Tabs -->
   <div class="tabs-container">
     <div class="tabs">

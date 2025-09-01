@@ -20,6 +20,8 @@ from data_manager import (
     load_new_followers,
     save_new_followers,
     load_ignore_list,
+    add_to_ignore_list,
+    remove_from_ignore_list,
 )
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -94,20 +96,20 @@ def get_data():
         if data_type == 'followers':
             current_followers = get_followers_with_counts()
             # Apply ignore list
-            current_followers = [user for user in current_followers if user['login'] not in ignore_list]
+            current_followers = [user for user in current_followers if user['login'].lower() not in ignore_list]
             data = {'followers': current_followers}
             return jsonify(data)
         elif data_type == 'following':
             current_following = get_following()
             # Apply ignore list
-            current_following = [f for f in current_following if f['login'] not in ignore_list]
+            current_following = [f for f in current_following if f['login'].lower() not in ignore_list]
             data = {'following': current_following}
             return jsonify(data)
         elif data_type == 'new_followers':
             current_followers = get_followers()
             new_followers = list(set(current_followers) - set(previous_followers))
             # Apply ignore list
-            new_followers = [user for user in new_followers if user not in ignore_list]
+            new_followers = [user for user in new_followers if user.lower() not in ignore_list]
             # Update stored_new_followers
             for follower in new_followers:
                 if follower not in stored_new_followers:
@@ -125,18 +127,18 @@ def get_data():
             current_followers = get_followers()
             unfollowers = list(set(previous_followers) - set(current_followers))
             # Apply ignore list
-            unfollowers = [user for user in unfollowers if user not in ignore_list]
+            unfollowers = [user for user in unfollowers if user.lower() not in ignore_list]
             unfollowers_info = get_users_info(unfollowers)
             data = {'unfollowers': unfollowers_info}
             return jsonify(data)
         elif data_type == 'not_following_back':
             current_followers = get_followers()
             current_following = get_following()
-            current_follower_logins = set(current_followers)
+            current_follower_logins = set(u.lower() for u in current_followers)
             not_following_back = [
                 f['login']
                 for f in current_following
-                if f['login'] not in current_follower_logins and f['login'] not in ignore_list
+                if f['login'].lower() not in current_follower_logins and f['login'].lower() not in ignore_list
             ]
             not_following_back_info = get_users_info(not_following_back)
             data = {'not_following_back': not_following_back_info}
@@ -145,7 +147,7 @@ def get_data():
             # Fetch random users
             random_users = get_random_users()
             # Apply ignore list
-            random_users = [user for user in random_users if user['login'] not in ignore_list]
+            random_users = [user for user in random_users if user['login'].lower() not in ignore_list]
             data = {'suggested_users': random_users}
             return jsonify(data)
         elif data_type == 'users_more_following':
@@ -158,7 +160,7 @@ def get_data():
                     'difference': follower['following'] - follower['followers']
                 }
                 for follower in followers_with_counts
-                if (follower['following'] - follower['followers'] >= 25) and follower['login'] not in ignore_list
+                if (follower['following'] - follower['followers'] >= 25) and follower['login'].lower() not in ignore_list
             ]
             # Sort users by the biggest difference
             users_more_following.sort(key=lambda x: x['difference'], reverse=True)
@@ -216,6 +218,45 @@ def check_follow():
     except Exception as e:
         logger.exception(f"Error checking if user {username} follows viewer: {e}")
         return jsonify({'error': 'An error occurred while checking the user'}), 500
+
+
+# Ignore list management endpoints
+@app.route('/api/ignore-list', methods=['GET'])
+def get_ignore_list():
+    try:
+        ignore_list = load_ignore_list()
+        return jsonify({'ignore_list': ignore_list})
+    except Exception as e:
+        logger.exception(f"Error loading ignore list: {e}")
+        return jsonify({'error': 'Failed to load ignore list'}), 500
+
+
+@app.route('/api/ignore-list', methods=['POST'])
+def add_ignore():
+    data = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip()
+    if not username:
+        return jsonify({'error': 'Username is required'}), 400
+    try:
+        updated = add_to_ignore_list(username)
+        return jsonify({'ignore_list': updated})
+    except Exception as e:
+        logger.exception(f"Error adding to ignore list: {e}")
+        return jsonify({'error': 'Failed to add username to ignore list'}), 500
+
+
+@app.route('/api/ignore-list', methods=['DELETE'])
+def remove_ignore():
+    data = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip()
+    if not username:
+        return jsonify({'error': 'Username is required'}), 400
+    try:
+        updated = remove_from_ignore_list(username)
+        return jsonify({'ignore_list': updated})
+    except Exception as e:
+        logger.exception(f"Error removing from ignore list: {e}")
+        return jsonify({'error': 'Failed to remove username from ignore list'}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=9999)

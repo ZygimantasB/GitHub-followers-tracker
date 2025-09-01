@@ -199,3 +199,75 @@ These tasks run in the background as long as the application is running. You can
 ### 12. Contributing
 
 If you'd like to contribute to this project, please fork the repository and create a pull request with your changes. Bug reports, feature requests, and feedback are always welcome.
+
+
+### 13. Scheduling and Automation
+
+You have two ways to run the automated follow/unfollow tasks. No external cron is required if you keep one of these processes running.
+
+Option A — Run the Flask app (built‑in scheduler)
+- Command: python app.py
+- Schedules (local time):
+  - Daily follow at 6:00 AM
+  - Monthly unfollow at 1:00 AM on the 1st of each month
+- Runs automatically as long as the Flask app process stays running.
+
+Option B — Run the standalone scheduler (no web server)
+- Command: python scheduler.py
+- Schedules (local time):
+  - Daily follow at 2:00 PM
+  - Monthly unfollow at 2:05 PM on the last day of the month
+- Use this if you want the 2 PM daily behavior and end‑of‑month unfollow without running the web UI.
+
+Do I need Linux cron?
+- Not required if you keep app.py or scheduler.py running in a terminal/service. The scheduler inside the process will trigger tasks at the configured times.
+- Optional: Use cron or systemd to auto‑start and keep it running after logout or reboot.
+
+Examples (optional, for convenience):
+
+Systemd service (Linux)
+1) Create file at ~/.config/systemd/user/github-follower-scheduler.service with:
+
+[Unit]
+Description=GitHub Followers Tracker Scheduler
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/GitHub-followers-tracker
+ExecStart=%h/GitHub-followers-tracker/.venv/bin/python scheduler.py
+Restart=on-failure
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
+
+2) Enable and start:
+- systemctl --user daemon-reload
+- systemctl --user enable --now github-follower-scheduler.service
+
+Cron (Linux) to run at boot in background
+- @reboot /usr/bin/bash -lc 'cd "$HOME/GitHub-followers-tracker" && . .venv/bin/activate && exec python scheduler.py >> app.log 2>&1'
+
+Windows Task Scheduler
+- Create a basic task to run python with Program/script: path\to\python.exe, Add arguments: scheduler.py, Start in: the project folder. Set Trigger: At log on or On a schedule.
+
+Notes
+- Timezone: Both app.py and scheduler.py use local time. The standalone scheduler uses tzlocal to honor your system timezone.
+- Choose only one scheduler at a time to avoid duplicate actions (don’t run app.py and scheduler.py concurrently unless you deliberately want both schedules).
+
+
+## Managing the Ignore List from the Web UI
+
+You can now manage the ignore list directly from the application without editing files manually.
+
+- Open the app in your browser (default: http://localhost:9999/).
+- Scroll to the "Ignore List" card near the top of the page.
+- To add a username: enter the GitHub username and click "Add to Ignore".
+- To remove a username: click the "Remove" button next to it.
+- Click "Refresh" to reload the current list from disk.
+
+Technical notes:
+- The ignore list is persisted in the file `ignore_list.txt` (one username per line) in the project root.
+- Usernames are normalized (trimmed and lowercased) and duplicates are removed automatically.
+- The ignore list affects multiple views (Followers, Following, New Followers, Unfollowers, Not Following Back, Suggested Users). Users in the ignore list are hidden from these sections.
